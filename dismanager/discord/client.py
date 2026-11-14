@@ -15,7 +15,7 @@ from ..core.i18n import Translator
 from ..core.logs import mute_console_logging
 from .commands import setup as setup_commands
 from .panel import PanelView, update_panel
-from .threads import get_or_create_thread
+from .utils import get_or_create_thread
 
 PANEL_REFRESH_SECONDS = 15
 ERROR_THREAD_NAME = 'Error Reports'

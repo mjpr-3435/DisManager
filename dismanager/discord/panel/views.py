@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from ..confirm import confirmation_request
+from ..utils import confirmation_request
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
