@@ -111,7 +111,28 @@ def _populate_file_embed(embed: discord.Embed, path: Path) -> None:
     populate_file_preview(embed, path, stat.st_size)
     size = format_bytes(stat.st_size)
     modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).astimezone().strftime('%Y-%m-%d %H:%M')
-    embed.set_footer(text=f'Size: {size} | Modified: {modified}')
+    footer_parts = [f'Size: {size}', f'Modified: {modified}']
+    position = _get_file_position(path)
+    if position is not None:
+        idx, total_files = position
+        file_page = idx // 99 + 1
+        total_pages = max(1, math.ceil(total_files / 99))
+        page_idx = (idx % 99) + 1
+        file_label = (
+            f'File {page_idx:02d} (#{idx + 1}/{total_files})'
+            if total_pages > 1
+            else f'File {idx + 1}/{total_files}'
+        )
+        footer_parts.extend([file_label, f'Page {file_page}/{total_pages}'])
+    embed.set_footer(text=' | '.join(footer_parts))
+
+
+def _get_file_position(path: Path) -> tuple[int, int] | None:
+    try:
+        _, sibling_files = list_directory_entries(path.parent)
+        return sibling_files.index(path), len(sibling_files)
+    except (OSError, ValueError):
+        return None
 
 
 def _get_size_bytes(path: Path) -> int:

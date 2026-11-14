@@ -96,6 +96,30 @@ class FilesView(discord.ui.View):
         self.add_item(_BackButton(disabled=self.path == self.root, row=1))
         self.add_item(_UpdateButton(row=1))
         self.add_item(_PathButton(row=1))
+        self._add_sibling_file_buttons()
+
+    def _add_sibling_file_buttons(self) -> None:
+        sibling_info = _get_sibling_files(self.path)
+        if sibling_info is None:
+            return
+        files, idx = sibling_info
+        if len(files) <= 1:
+            return
+
+        if len(files) > 2:
+            self.add_item(_SiblingFileButton('<<', target_path=files[0], disabled=idx <= 0))
+
+        self.add_item(_SiblingFileButton('<', target_path=files[max(0, idx - 1)], disabled=idx <= 0))
+        self.add_item(
+            _SiblingFileButton(
+                '>',
+                target_path=files[min(len(files) - 1, idx + 1)],
+                disabled=idx >= len(files) - 1,
+            )
+        )
+
+        if len(files) > 2:
+            self.add_item(_SiblingFileButton('>>', target_path=files[-1], disabled=idx >= len(files) - 1))
 
     def _build_select_options(self, dirs: list[Path], files: list[Path]) -> list[discord.SelectOption]:
         offset = (self.page - 1) * 99
@@ -133,6 +157,14 @@ def _clamp_to_root(path: Path, root: Path) -> Path:
     return resolved if resolved.is_relative_to(root) else root
 
 
+def _get_sibling_files(path: Path) -> tuple[list[Path], int] | None:
+    try:
+        _, files = list_directory_entries(path.parent)
+        return files, files.index(path)
+    except (OSError, ValueError):
+        return None
+
+
 class _FileSelect(discord.ui.Select[FilesView]):
     def __init__(self, placeholder: str, options: list[discord.SelectOption]) -> None:
         super().__init__(placeholder=placeholder, options=options, row=1)
@@ -149,7 +181,13 @@ class _BackButton(discord.ui.Button[FilesView]):
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        await self.view.navigate(interaction, self.view.path.parent)
+        parent_page = 1
+        if not self.view.path.is_dir():
+            sibling_info = _get_sibling_files(self.view.path)
+            if sibling_info is not None:
+                _, idx = sibling_info
+                parent_page = idx // 99 + 1
+        await self.view.navigate(interaction, self.view.path.parent, page=parent_page)
 
 
 class _UpdateButton(discord.ui.Button[FilesView]):
@@ -178,3 +216,13 @@ class _PageButton(discord.ui.Button[FilesView]):
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         await self.view.navigate(interaction, self.view.path, page=self._target_page)
+
+
+class _SiblingFileButton(discord.ui.Button[FilesView]):
+    def __init__(self, label: str, *, target_path: Path, disabled: bool) -> None:
+        super().__init__(label=label, style=discord.ButtonStyle.gray, row=2, disabled=disabled)
+        self._target_path = target_path
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        assert self.view is not None
+        await self.view.navigate(interaction, self._target_path)
