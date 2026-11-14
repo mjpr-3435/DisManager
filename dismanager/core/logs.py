@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 from collections import deque
 from datetime import datetime
 from logging.handlers import BaseRotatingHandler
@@ -10,7 +11,7 @@ from pathlib import Path
 from .paths import LOGS_DIR
 
 MAX_SESSION_FILES = 20
-MAX_FILE_BYTES = 50 * 1024 * 1024
+MAX_FILE_BYTES = 25 * 1024 * 1024
 MAX_MEMORY_BYTES = 8 * 1024 * 1024
 
 _memory_handler: _MemoryRingHandler | None = None
@@ -18,7 +19,7 @@ _session_filename = 'dismanager.log'
 
 
 def setup_logging() -> logging.Logger:
-    """Configure session file logging (50 MB cap), 8 MB memory ring, and pre-connection console."""
+    """Configure session file logging (25 MB cap), 8 MB memory ring, and pre-connection console."""
     global _memory_handler, _session_filename
 
     logger = logging.getLogger('dismanager')
@@ -29,13 +30,11 @@ def setup_logging() -> logging.Logger:
     logger.propagate = False
 
     LOGS_DIR.mkdir(parents=True, exist_ok=True)
-    _prune_old_sessions(LOGS_DIR, keep=MAX_SESSION_FILES - 1)
-
-    session_path = _next_session_path(LOGS_DIR)
-    _session_filename = session_path.name
+    session_writer = SessionLogWriter(LOGS_DIR, max_files=MAX_SESSION_FILES, max_bytes=MAX_FILE_BYTES)
+    _session_filename = session_writer.path.name
     formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(name)s: %(message)s')
 
-    file_handler = _CappedFileHandler(session_path, max_bytes=MAX_FILE_BYTES)
+    file_handler = _CappedFileHandler(session_writer)
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
@@ -87,58 +86,104 @@ class _ShortConsoleFormatter(logging.Formatter):
         return f'[{record.levelname}] {record.getMessage()}'
 
 
-class _CappedFileHandler(logging.FileHandler):
-    """FileHandler that stops writing once a hard byte limit is reached."""
+class SessionLogWriter:
+    """Thread-safe rotating session log file capped at ``max_bytes`` with ``max_files`` retention."""
 
-    def __init__(self, filename: Path, *, max_bytes: int) -> None:
-        super().__init__(filename, encoding='utf-8')
+    def __init__(
+        self,
+        logs_dir: Path,
+        *,
+        max_files: int = MAX_SESSION_FILES,
+        max_bytes: int = MAX_FILE_BYTES,
+    ) -> None:
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        _prune_old_sessions(logs_dir, keep=max(0, max_files - 1))
+        self.path = _next_session_path(logs_dir)
         self._max_bytes = max_bytes
-        self._bytes_written = filename.stat().st_size if filename.exists() else 0
+        self._bytes_written = 0
         self._capped = False
+        self._lock = threading.Lock()
+        self._stream = self.path.open('a', encoding='utf-8')
+
+    def write_line(self, line: str) -> None:
+        text = line if line.endswith('\n') else f'{line}\n'
+        msg_bytes = text.encode('utf-8', errors='replace')
+        with self._lock:
+            if self._capped or self._stream.closed:
+                return
+            if self._bytes_written + len(msg_bytes) > self._max_bytes:
+                self._capped = True
+                self._stream.write(f'[LOG LIMIT REACHED: {self._max_bytes // (1024 * 1024)} MB]\n')
+                self._stream.flush()
+                return
+            self._bytes_written += len(msg_bytes)
+            self._stream.write(text)
+            self._stream.flush()
+
+    def close(self) -> None:
+        with self._lock:
+            if not self._stream.closed:
+                self._stream.close()
+
+
+class _CappedFileHandler(logging.Handler):
+    """Logging handler backed by a ``SessionLogWriter``."""
+
+    def __init__(self, writer: SessionLogWriter) -> None:
+        super().__init__()
+        self._writer = writer
 
     def emit(self, record: logging.LogRecord) -> None:
-        if self._capped:
-            return
+        self._writer.write_line(self.format(record))
 
-        msg_bytes = (self.format(record) + self.terminator).encode('utf-8', errors='replace')
-        if self._bytes_written + len(msg_bytes) > self._max_bytes:
-            self._capped = True
-            if self.stream is not None:
-                self.stream.write(f'[LOG LIMIT REACHED: {self._max_bytes // (1024 * 1024)} MB]\n')
-                self.stream.flush()
-            return
-
-        self._bytes_written += len(msg_bytes)
-        super().emit(record)
+    def close(self) -> None:
+        self._writer.close()
+        super().close()
 
 
-class _MemoryRingHandler(logging.Handler):
-    """In-memory ring buffer keeping the most recent log lines within max_bytes."""
+class ByteRingBuffer:
+    """Thread-safe in-memory ring buffer keeping the most recent lines within ``max_bytes``."""
 
-    def __init__(self, *, max_bytes: int) -> None:
-        super().__init__()
+    def __init__(self, *, max_bytes: int = MAX_MEMORY_BYTES) -> None:
         self._max_bytes = max_bytes
         self._chunks: deque[bytes] = deque()
         self._total_bytes = 0
+        self._lock = threading.Lock()
 
-    def emit(self, record: logging.LogRecord) -> None:
-        line = (self.format(record) + '\n').encode('utf-8', errors='replace')
-        if len(line) > self._max_bytes:
-            line = line[-self._max_bytes :]
+    def append(self, line: str) -> None:
+        chunk = (line + '\n').encode('utf-8', errors='replace')
+        if len(chunk) > self._max_bytes:
+            chunk = chunk[-self._max_bytes :]
 
-        self._chunks.append(line)
-        self._total_bytes += len(line)
-
-        while self._total_bytes > self._max_bytes and self._chunks:
-            removed = self._chunks.popleft()
-            self._total_bytes -= len(removed)
+        with self._lock:
+            self._chunks.append(chunk)
+            self._total_bytes += len(chunk)
+            while self._total_bytes > self._max_bytes and self._chunks:
+                removed = self._chunks.popleft()
+                self._total_bytes -= len(removed)
 
     def get_bytes(self) -> bytes:
-        self.acquire()
-        try:
+        with self._lock:
             return b''.join(self._chunks)
-        finally:
-            self.release()
+
+    def clear(self) -> None:
+        with self._lock:
+            self._chunks.clear()
+            self._total_bytes = 0
+
+
+class _MemoryRingHandler(logging.Handler):
+    """Logging handler backed by a ``ByteRingBuffer``."""
+
+    def __init__(self, *, max_bytes: int) -> None:
+        super().__init__()
+        self._buffer = ByteRingBuffer(max_bytes=max_bytes)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self._buffer.append(self.format(record))
+
+    def get_bytes(self) -> bytes:
+        return self._buffer.get_bytes()
 
 
 def _next_session_path(logs_dir: Path) -> Path:
