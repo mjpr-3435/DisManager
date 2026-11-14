@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
+from ..guide import build_guide_embed
 from ..utils import confirmation_request
 
 if TYPE_CHECKING:
@@ -16,12 +17,21 @@ class PanelView(discord.ui.View):
     def __init__(self, bot: DisManagerClient) -> None:
         super().__init__(timeout=None)
         self.bot = bot
+        self.add_item(_GuideButton())
         self.add_item(_RestartButton(bot))
 
 
 # =========================================
 #            Internal Helpers
 # =========================================
+
+
+class _GuideButton(discord.ui.Button[PanelView]):
+    def __init__(self) -> None:
+        super().__init__(label='Guide', style=discord.ButtonStyle.gray)
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        await interaction.response.send_message(embed=build_guide_embed(), ephemeral=True)
 
 
 class _RestartButton(discord.ui.Button[PanelView]):
