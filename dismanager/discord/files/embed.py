@@ -31,12 +31,16 @@ def get_max_page(dir_count: int, file_count: int) -> int:
     return max(1, math.ceil(dir_count / 99), math.ceil(file_count / 99))
 
 
-def compute_path_size(path: Path) -> str:
-    """Compute human-readable total size of a file or directory tree."""
-    total = _get_size_bytes(path)
+def format_bytes(total: int) -> str:
+    """Format a byte count into a human-readable size string."""
     units = ('B', 'KB', 'MB', 'GB', 'TB')
     unit_idx = min(int(math.log(total, 1024)), len(units) - 1) if total > 0 else 0
     return f'{total / (1024**unit_idx):.1f} {units[unit_idx]}'
+
+
+def compute_path_size(path: Path) -> str:
+    """Compute human-readable total size of a file or directory tree."""
+    return format_bytes(_get_size_bytes(path))
 
 
 def build_files_embed(

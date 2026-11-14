@@ -63,6 +63,9 @@ msgstr  "Consola"
 msgid   "Panel"
 msgstr  "Panel"
 
+msgid   "Error Reports"
+msgstr  "Reportes de errores"
+
 
 ### ———————————————————————————————————————
 ### files
@@ -132,3 +135,24 @@ msgstr  "✖ No se pudo eliminar la carpeta: {}"
 
 msgid   "✖ You cannot delete the root `DisManager` directory."
 msgstr  "✖ No puedes eliminar el directorio raíz `DisManager`."
+
+msgid   "Compress to .zip"
+msgstr  "Comprimir a .zip"
+
+msgid   "Create a .zip archive of this directory"
+msgstr  "Crea un archivo .zip de esta carpeta"
+
+msgid   "Are you sure you want to compress `{}` into `{}`? Any existing file with the same name will be overwritten."
+msgstr  "¿Seguro que quieres comprimir `{}` en `{}`? Cualquier archivo existente con el mismo nombre será sobrescrito."
+
+msgid   "Compressing `{}`..."
+msgstr  "Comprimiendo `{}`..."
+
+msgid   "✔ Compressed into `{}`."
+msgstr  "✔ Comprimido en `{}`."
+
+msgid   "✖ Failed to compress `{}` (exit code {})."
+msgstr  "✖ No se pudo comprimir `{}` (código {})."
+
+msgid   "✖ Failed to compress `{}`: {}"
+msgstr  "✖ No se pudo comprimir `{}`: {}"

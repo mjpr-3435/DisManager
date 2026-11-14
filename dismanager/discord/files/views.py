@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -12,6 +14,7 @@ from ..utils import confirmation_request
 from .embed import (
     build_files_embed,
     compute_path_size,
+    format_bytes,
     get_max_page,
     list_directory_entries,
     to_dismanager_path,
@@ -149,6 +152,77 @@ def _resolve_dismanager_path(raw_path: str, root: Path) -> Path | None:
     return candidate
 
 
+async def _run_zip_command(
+    target: Path,
+    tmp_zip: Path,
+    zip_name: str,
+    confirm_interaction: discord.Interaction[Any],
+    files_view: FilesView,
+) -> int:
+    total = await asyncio.to_thread(_count_entries, target, exclude=zip_name)
+    if os.name == 'nt' or shutil.which('zip') is None:
+        cmd = ['tar', '-a', '-v', '-cf', str(tmp_zip), '--exclude', zip_name, '.']
+    else:
+        cmd = ['zip', '-r', str(tmp_zip), '.', '-x', zip_name]
+
+    proc = await asyncio.create_subprocess_exec(
+        *cmd,
+        cwd=target,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.STDOUT,
+    )
+
+    processed = 0
+
+    async def _consume_output() -> None:
+        nonlocal processed
+        if proc.stdout is None:
+            return
+        while raw_line := await proc.stdout.readline():
+            if raw_line.strip():
+                processed += 1
+
+    reader_task = asyncio.create_task(_consume_output())
+    wait_task = asyncio.create_task(proc.wait())
+
+    while not wait_task.done():
+        await asyncio.sleep(0.8)
+        if wait_task.done():
+            break
+        size_bytes = tmp_zip.stat().st_size if tmp_zip.exists() else 0
+        current = min(processed, total)
+        prefix = f'`[{current}/{total}]` ' if total > 0 else ''
+        suffix = f' ({format_bytes(size_bytes)})' if size_bytes > 0 else ''
+        with contextlib.suppress(discord.HTTPException):
+            await confirm_interaction.edit_original_response(
+                content=prefix + files_view.bot._('Compressing `{}`...').format(zip_name) + suffix
+            )
+
+    await reader_task
+    return await wait_task
+
+
+def _count_entries(root: Path, *, exclude: str) -> int:
+    count = 1
+    stack: list[Path] = [root]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    if entry.name == exclude and current == root:
+                        continue
+                    count += 1
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(Path(entry.path))
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+    return count
+
+
 class _FileSelect(discord.ui.Select[FilesView]):
     def __init__(self, placeholder: str, options: list[discord.SelectOption]) -> None:
         super().__init__(placeholder=placeholder, options=options, row=1)
@@ -200,6 +274,11 @@ class _ActionsSelect(discord.ui.Select[FilesView]):
                 description=bot._('Upload up to 10 files to this directory'),
             ),
             discord.SelectOption(
+                label=bot._('Compress to .zip'),
+                value='zip',
+                description=bot._('Create a .zip archive of this directory'),
+            ),
+            discord.SelectOption(
                 label=bot._('Delete directory'),
                 value='delete',
                 description=bot._('Permanently delete this directory'),
@@ -217,18 +296,10 @@ class _ActionsSelect(discord.ui.Select[FilesView]):
             await self.view.navigate(interaction, self.view.path, page=self.view.page, size_text=size_text)
         elif action == 'upload':
             await interaction.response.send_modal(_UploadModal(self.view))
-            await self._reset_selection(interaction)
+        elif action == 'zip':
+            await self._confirm_zip(interaction)
         elif action == 'delete':
             await self._confirm_delete(interaction)
-            await self._reset_selection(interaction)
-
-    async def _reset_selection(self, interaction: discord.Interaction[Any]) -> None:
-        assert self.view is not None
-        if interaction.message is None:
-            return
-        self.view.render(self.view.path, page=self.view.page)
-        with contextlib.suppress(discord.HTTPException):
-            await interaction.followup.edit_message(message_id=interaction.message.id, view=self.view)
 
     async def _confirm_delete(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -261,6 +332,53 @@ class _ActionsSelect(discord.ui.Select[FilesView]):
             files_view.bot._('Are you sure you want to delete `{}`?').format(
                 to_dismanager_path(target, files_view.root)
             ),
+            interaction=interaction,
+            on_confirmation=on_confirmation,
+        )
+
+    async def _confirm_zip(self, interaction: discord.Interaction[Any]) -> None:
+        assert self.view is not None
+        files_view = self.view
+        target = files_view.path.resolve()
+        if not target.is_relative_to(files_view.root):
+            return
+
+        zip_name = f'{target.name}.zip'
+        zip_path = target / zip_name
+
+        async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
+            await confirm_interaction.response.edit_message(
+                content=files_view.bot._('Compressing `{}`...').format(zip_name),
+                embed=None,
+                view=None,
+            )
+            tmp_dir = Path(tempfile.mkdtemp(prefix='dismanager_zip_'))
+            tmp_zip = tmp_dir / zip_name
+            try:
+                rc = await _run_zip_command(target, tmp_zip, zip_name, confirm_interaction, files_view)
+                if rc != 0 or not tmp_zip.exists():
+                    await confirm_interaction.edit_original_response(
+                        content=files_view.bot._('✖ Failed to compress `{}` (exit code {}).').format(zip_name, rc)
+                    )
+                    return
+
+                await asyncio.to_thread(shutil.move, str(tmp_zip), str(zip_path))
+                await files_view.navigate(interaction, target, page=files_view.page)
+                await confirm_interaction.edit_original_response(
+                    content=files_view.bot._('✔ Compressed into `{}`.').format(zip_name)
+                )
+            except OSError as exc:
+                await confirm_interaction.edit_original_response(
+                    content=files_view.bot._('✖ Failed to compress `{}`: {}').format(zip_name, exc)
+                )
+            finally:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        await confirmation_request(
+            files_view.bot._(
+                'Are you sure you want to compress `{}` into `{}`? '
+                'Any existing file with the same name will be overwritten.'
+            ).format(to_dismanager_path(target, files_view.root), zip_name),
             interaction=interaction,
             on_confirmation=on_confirmation,
         )
@@ -359,7 +477,7 @@ class _UploadModal(discord.ui.Modal):
                     content=self._format_progress(idx, total, saved, skipped, failed),
                 )
 
-        if saved and interaction.message is not None:
+        if interaction.message is not None:
             embed = self._files_view.render(self._files_view.path, page=self._files_view.page)
             await interaction.followup.edit_message(
                 message_id=interaction.message.id,
