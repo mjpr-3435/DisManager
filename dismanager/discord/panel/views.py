@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
+from ..files import FilesView
 from ..guide import build_guide_embed
 from ..utils import confirmation_request
 
@@ -17,6 +18,7 @@ class PanelView(discord.ui.View):
     def __init__(self, bot: DisManagerClient) -> None:
         super().__init__(timeout=None)
         self.bot = bot
+        self.add_item(_FilesButton(bot))
         self.add_item(_GuideButton())
         self.add_item(_RestartButton(bot))
 
@@ -24,6 +26,18 @@ class PanelView(discord.ui.View):
 # =========================================
 #            Internal Helpers
 # =========================================
+
+
+class _FilesButton(discord.ui.Button[PanelView]):
+    def __init__(self, bot: DisManagerClient) -> None:
+        super().__init__(label='Files', style=discord.ButtonStyle.gray)
+        self.bot = bot
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        view = FilesView(self.bot)
+        embed = view.render(view.path)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 
 class _GuideButton(discord.ui.Button[PanelView]):
