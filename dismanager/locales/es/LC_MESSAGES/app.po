@@ -228,3 +228,75 @@ msgstr  "✖ No puedes renombrar el directorio raíz `DisManager`."
 
 msgid   "✖ Could not rename directory: {}"
 msgstr  "✖ No se pudo renombrar la carpeta: {}"
+
+msgid   "File actions"
+msgstr  "Acciones de archivo"
+
+msgid   "Download"
+msgstr  "Descargar"
+
+msgid   "Send this file in an ephemeral message"
+msgstr  "Envía este archivo en un mensaje efímero"
+
+msgid   "Rename file"
+msgstr  "Renombrar archivo"
+
+msgid   "Rename this file"
+msgstr  "Renombra este archivo"
+
+msgid   "Edit file"
+msgstr  "Editar archivo"
+
+msgid   "Edit this text file in a modal"
+msgstr  "Edita este archivo de texto en un modal"
+
+msgid   "Unzip"
+msgstr  "Descomprimir .zip"
+
+msgid   "Extract this archive into the current folder"
+msgstr  "Extrae este archivo en la carpeta actual"
+
+msgid   "Delete file"
+msgstr  "Eliminar archivo"
+
+msgid   "Permanently delete this file"
+msgstr  "Elimina permanentemente este archivo"
+
+msgid   "✖ Could not read file: {}"
+msgstr  "✖ No se pudo leer el archivo: {}"
+
+msgid   "✖ File is too large to send ({} > {})."
+msgstr  "✖ El archivo es demasiado grande para enviarlo ({} > {})."
+
+msgid   "✖ File exceeds the 4000-character modal limit."
+msgstr  "✖ El archivo supera el límite de 4000 caracteres del modal."
+
+msgid   "Extracting `{}`..."
+msgstr  "Extrayendo `{}`..."
+
+msgid   "✔ Extracted `{}`."
+msgstr  "✔ Extraído `{}`."
+
+msgid   "✖ Failed to extract `{}` (exit code {})."
+msgstr  "✖ No se pudo extraer `{}` (código {})."
+
+msgid   "✖ Failed to extract `{}`: {}"
+msgstr  "✖ No se pudo extraer `{}`: {}"
+
+msgid   "Are you sure you want to extract `{}` into `{}`? Any existing files with the same name will be overwritten."
+msgstr  "¿Seguro que quieres extraer `{}` en `{}`? Cualquier archivo existente con el mismo nombre será sobrescrito."
+
+msgid   "✖ Invalid name."
+msgstr  "✖ Nombre no válido."
+
+msgid   "✖ Could not rename: {}"
+msgstr  "✖ No se pudo renombrar: {}"
+
+msgid   "Content"
+msgstr  "Contenido"
+
+msgid   "✖ Could not save file: {}"
+msgstr  "✖ No se pudo guardar el archivo: {}"
+
+msgid   "✔ Saved `{}`."
+msgstr  "✔ Guardado `{}`."
