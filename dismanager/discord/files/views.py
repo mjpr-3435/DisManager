@@ -6,7 +6,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import discord
 
@@ -264,9 +264,19 @@ class _ActionsSelect(discord.ui.Select[FilesView]):
     def __init__(self, bot: DisManagerClient) -> None:
         options = [
             discord.SelectOption(
+                label=bot._('Open by index'),
+                value='cd',
+                description=bot._('Open a directory or file by its index on this page'),
+            ),
+            discord.SelectOption(
                 label=bot._('Calculate size'),
                 value='size',
                 description=bot._('Compute total size of this directory'),
+            ),
+            discord.SelectOption(
+                label=bot._('Create directory'),
+                value='mkdir',
+                description=bot._('Create a new folder inside this directory'),
             ),
             discord.SelectOption(
                 label=bot._('Upload files'),
@@ -277,6 +287,16 @@ class _ActionsSelect(discord.ui.Select[FilesView]):
                 label=bot._('Compress to .zip'),
                 value='zip',
                 description=bot._('Create a .zip archive of this directory'),
+            ),
+            discord.SelectOption(
+                label=bot._('Rename directory'),
+                value='rename',
+                description=bot._('Rename this directory'),
+            ),
+            discord.SelectOption(
+                label=bot._('Delete by index'),
+                value='del',
+                description=bot._('Delete a directory or file by its index on this page'),
             ),
             discord.SelectOption(
                 label=bot._('Delete directory'),
@@ -290,16 +310,36 @@ class _ActionsSelect(discord.ui.Select[FilesView]):
         assert self.view is not None
         action = self.values[0]
 
-        if action == 'size':
+        if action == 'cd':
+            await interaction.response.send_modal(_IndexActionModal(self.view, mode='open'))
+        elif action == 'del':
+            await interaction.response.send_modal(_IndexActionModal(self.view, mode='delete'))
+        elif action == 'size':
             await interaction.response.defer()
             size_text = await asyncio.to_thread(compute_path_size, self.view.path)
             await self.view.navigate(interaction, self.view.path, page=self.view.page, size_text=size_text)
         elif action == 'upload':
             await interaction.response.send_modal(_UploadModal(self.view))
+        elif action == 'mkdir':
+            await interaction.response.send_modal(_CreateDirModal(self.view))
         elif action == 'zip':
             await self._confirm_zip(interaction)
+        elif action == 'rename':
+            await self._open_rename(interaction)
         elif action == 'delete':
             await self._confirm_delete(interaction)
+
+    async def _open_rename(self, interaction: discord.Interaction[Any]) -> None:
+        assert self.view is not None
+        files_view = self.view
+        target = files_view.path.resolve()
+        if target == files_view.root:
+            await interaction.response.send_message(
+                files_view.bot._('✖ You cannot rename the root `DisManager` directory.'),
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_modal(_RenameDirModal(files_view))
 
     async def _confirm_delete(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -417,6 +457,199 @@ class _GoToPathModal(discord.ui.Modal):
             return
 
         await self._files_view.navigate(interaction, target)
+
+
+def _is_valid_entry_name(name: str) -> bool:
+    return bool(name) and name not in {'.', '..'} and not any(ch in name for ch in '<>:"/\\|?*')
+
+
+class _CreateDirModal(discord.ui.Modal):
+    name_input: discord.ui.TextInput[Any]
+
+    def __init__(self, files_view: FilesView) -> None:
+        super().__init__(title=files_view.bot._('Create directory'))
+        self._files_view = files_view
+        self.name_input = discord.ui.TextInput(
+            label=files_view.bot._('Directory name'),
+            style=discord.TextStyle.short,
+            placeholder=files_view.bot._('E.g.: backups'),
+            max_length=100,
+        )
+        self.add_item(self.name_input)
+
+    async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
+        name = self.name_input.value.strip()
+        target_dir = self._files_view.path.resolve()
+        dest = (target_dir / name).resolve()
+        if not _is_valid_entry_name(name) or dest.parent != target_dir:
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ Invalid directory name.'),
+                ephemeral=True,
+            )
+            return
+
+        if dest.exists():
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ `{}` already exists.').format(name),
+                ephemeral=True,
+            )
+            return
+
+        try:
+            dest.mkdir()
+        except OSError as exc:
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ Could not create directory: {}').format(exc),
+                ephemeral=True,
+            )
+            return
+
+        await self._files_view.navigate(interaction, self._files_view.path, page=self._files_view.page)
+
+
+class _RenameDirModal(discord.ui.Modal):
+    name_input: discord.ui.TextInput[Any]
+
+    def __init__(self, files_view: FilesView) -> None:
+        super().__init__(title=files_view.bot._('Rename directory'))
+        self._files_view = files_view
+        self.name_input = discord.ui.TextInput(
+            label=files_view.bot._('New name'),
+            style=discord.TextStyle.short,
+            default=files_view.path.name,
+            max_length=100,
+        )
+        self.add_item(self.name_input)
+
+    async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
+        new_name = self.name_input.value.strip()
+        target = self._files_view.path.resolve()
+        if target == self._files_view.root or not target.is_relative_to(self._files_view.root):
+            return
+
+        if new_name == target.name:
+            await self._files_view.navigate(interaction, target, page=self._files_view.page)
+            return
+
+        dest = (target.parent / new_name).resolve()
+        if not _is_valid_entry_name(new_name) or dest.parent != target.parent:
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ Invalid directory name.'),
+                ephemeral=True,
+            )
+            return
+
+        if dest.exists():
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ `{}` already exists.').format(new_name),
+                ephemeral=True,
+            )
+            return
+
+        try:
+            target.rename(dest)
+        except OSError as exc:
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ Could not rename directory: {}').format(exc),
+                ephemeral=True,
+            )
+            return
+
+        await self._files_view.navigate(interaction, dest)
+
+
+class _IndexActionModal(discord.ui.Modal):
+    def __init__(self, files_view: FilesView, *, mode: Literal['open', 'delete']) -> None:
+        title = files_view.bot._('Open by index') if mode == 'open' else files_view.bot._('Delete by index')
+        super().__init__(title=title)
+        self._files_view = files_view
+        self._mode = mode
+        self._kind_select: discord.ui.Select[Any] = discord.ui.Select(
+            options=[
+                discord.SelectOption(label=files_view.bot._('Directory'), value='dir', default=True),
+                discord.SelectOption(label=files_view.bot._('File'), value='file'),
+            ]
+        )
+        self._index_input: discord.ui.TextInput[Any] = discord.ui.TextInput(
+            label=files_view.bot._('Index'),
+            style=discord.TextStyle.short,
+            placeholder='1 - 99',
+            max_length=2,
+        )
+        self.add_item(
+            discord.ui.Label(
+                text=files_view.bot._('Type'),
+                component=self._kind_select,
+            )
+        )
+        self.add_item(self._index_input)
+
+    async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
+        raw_index = self._index_input.value.strip()
+        if not raw_index.isdigit():
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ The index must be a number.'),
+                ephemeral=True,
+            )
+            return
+
+        index = int(raw_index)
+        try:
+            dirs, files = list_directory_entries(self._files_view.path)
+        except OSError as exc:
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ Could not read directory: {}').format(exc),
+                ephemeral=True,
+            )
+            return
+
+        offset = (self._files_view.page - 1) * 99
+        kind = self._kind_select.values[0]
+        entries = (dirs if kind == 'dir' else files)[offset : offset + 99]
+
+        if index < 1 or index > len(entries):
+            await interaction.response.send_message(
+                self._files_view.bot._('✖ Index out of range (1-{}).').format(len(entries)),
+                ephemeral=True,
+            )
+            return
+
+        target = entries[index - 1]
+        if self._mode == 'open':
+            await self._files_view.navigate(interaction, target)
+            return
+
+        await self._confirm_delete_entry(interaction, target)
+
+    async def _confirm_delete_entry(self, interaction: discord.Interaction[Any], target: Path) -> None:
+        resolved = target.resolve()
+        if resolved == self._files_view.root or not resolved.is_relative_to(self._files_view.root):
+            return
+
+        async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
+            try:
+                if resolved.is_dir():
+                    await asyncio.to_thread(shutil.rmtree, resolved)
+                else:
+                    await asyncio.to_thread(resolved.unlink)
+            except OSError as exc:
+                await confirm_interaction.response.edit_message(
+                    content=self._files_view.bot._('✖ Could not delete `{}`: {}').format(resolved.name, exc),
+                    embed=None,
+                    view=None,
+                )
+                return
+
+            await confirm_interaction.response.edit_message(delete_after=0)
+            await self._files_view.navigate(interaction, self._files_view.path, page=self._files_view.page)
+
+        await confirmation_request(
+            self._files_view.bot._('Are you sure you want to delete `{}`?').format(
+                to_dismanager_path(resolved, self._files_view.root)
+            ),
+            interaction=interaction,
+            on_confirmation=on_confirmation,
+        )
 
 
 class _UploadModal(discord.ui.Modal):

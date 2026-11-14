@@ -156,3 +156,75 @@ msgstr  "✖ No se pudo comprimir `{}` (código {})."
 
 msgid   "✖ Failed to compress `{}`: {}"
 msgstr  "✖ No se pudo comprimir `{}`: {}"
+
+msgid   "Create directory"
+msgstr  "Crear carpeta"
+
+msgid   "Create a new folder inside this directory"
+msgstr  "Crea una nueva carpeta dentro de este directorio"
+
+msgid   "Directory name"
+msgstr  "Nombre de la carpeta"
+
+msgid   "E.g.: backups"
+msgstr  "Ej.: backups"
+
+msgid   "✖ Invalid directory name."
+msgstr  "✖ Nombre de carpeta no válido."
+
+msgid   "✖ `{}` already exists."
+msgstr  "✖ `{}` ya existe."
+
+msgid   "✖ Could not create directory: {}"
+msgstr  "✖ No se pudo crear la carpeta: {}"
+
+msgid   "Open by index"
+msgstr  "Abrir por índice"
+
+msgid   "Open a directory or file by its index on this page"
+msgstr  "Abre una carpeta o archivo por su índice en esta página"
+
+msgid   "Type"
+msgstr  "Tipo"
+
+msgid   "Directory"
+msgstr  "Carpeta"
+
+msgid   "File"
+msgstr  "Archivo"
+
+msgid   "Index"
+msgstr  "Índice"
+
+msgid   "✖ The index must be a number."
+msgstr  "✖ El índice debe ser un número."
+
+msgid   "✖ Could not read directory: {}"
+msgstr  "✖ No se pudo leer la carpeta: {}"
+
+msgid   "✖ Index out of range (1-{})."
+msgstr  "✖ Índice fuera de rango (1-{})."
+
+msgid   "Delete by index"
+msgstr  "Eliminar por índice"
+
+msgid   "Delete a directory or file by its index on this page"
+msgstr  "Elimina una carpeta o archivo por su índice en esta página"
+
+msgid   "✖ Could not delete `{}`: {}"
+msgstr  "✖ No se pudo eliminar `{}`: {}"
+
+msgid   "Rename directory"
+msgstr  "Renombrar carpeta"
+
+msgid   "Rename this directory"
+msgstr  "Renombra esta carpeta"
+
+msgid   "New name"
+msgstr  "Nuevo nombre"
+
+msgid   "✖ You cannot rename the root `DisManager` directory."
+msgstr  "✖ No puedes renombrar el directorio raíz `DisManager`."
+
+msgid   "✖ Could not rename directory: {}"
+msgstr  "✖ No se pudo renombrar la carpeta: {}"
