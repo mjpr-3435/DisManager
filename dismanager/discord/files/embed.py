@@ -7,6 +7,8 @@ from pathlib import Path
 
 import discord
 
+from .preview import populate_file_preview
+
 
 def to_dismanager_path(path: Path, root: Path) -> str:
     """Format a filesystem path under ``root`` with the ``DisManager`` mask."""
@@ -106,6 +108,7 @@ def _populate_file_embed(embed: discord.Embed, path: Path) -> None:
         embed.description = f'```\n{exc}```'
         return
 
+    populate_file_preview(embed, path, stat.st_size)
     size = format_bytes(stat.st_size)
     modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).astimezone().strftime('%Y-%m-%d %H:%M')
     embed.set_footer(text=f'Size: {size} | Modified: {modified}')

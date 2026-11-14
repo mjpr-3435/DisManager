@@ -8,6 +8,7 @@ import discord
 from .actions import DirectoryActionsSelect, FileActionsSelect
 from .embed import build_files_embed, get_max_page, list_directory_entries
 from .modals import GoToPathModal
+from .preview import build_file_attachment
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
@@ -54,12 +55,14 @@ class FilesView(discord.ui.View):
             await interaction.response.defer()
 
         embed = self.render(path, page=page, size_text=size_text)
+        attachment = build_file_attachment(self.path)
         message = interaction.message
         if message is not None:
             await interaction.followup.edit_message(
                 message_id=message.id,
                 embed=embed,
                 view=self,
+                attachments=[attachment] if attachment is not None else [],
             )
 
     # =========================================
