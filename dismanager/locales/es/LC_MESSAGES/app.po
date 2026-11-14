@@ -129,3 +129,6 @@ msgstr  "¿Seguro que quieres eliminar `{}`?"
 
 msgid   "✖ Could not delete directory: {}"
 msgstr  "✖ No se pudo eliminar la carpeta: {}"
+
+msgid   "✖ You cannot delete the root `DisManager` directory."
+msgstr  "✖ No puedes eliminar el directorio raíz `DisManager`."

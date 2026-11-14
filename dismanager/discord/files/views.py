@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -82,7 +83,7 @@ class FilesView(discord.ui.View):
         self.max_page = get_max_page(len(dirs), len(files))
         self.page = min(max(page, 1), self.max_page)
 
-        self.add_item(_ActionsSelect(self.bot, can_delete=self.path != self.root))
+        self.add_item(_ActionsSelect(self.bot))
 
         options = self._build_select_options(dirs, files)
         if options:
@@ -186,7 +187,7 @@ class _PathButton(discord.ui.Button[FilesView]):
 
 
 class _ActionsSelect(discord.ui.Select[FilesView]):
-    def __init__(self, bot: DisManagerClient, *, can_delete: bool) -> None:
+    def __init__(self, bot: DisManagerClient) -> None:
         options = [
             discord.SelectOption(
                 label=bot._('Calculate size'),
@@ -198,15 +199,12 @@ class _ActionsSelect(discord.ui.Select[FilesView]):
                 value='upload',
                 description=bot._('Upload up to 10 files to this directory'),
             ),
+            discord.SelectOption(
+                label=bot._('Delete directory'),
+                value='delete',
+                description=bot._('Permanently delete this directory'),
+            ),
         ]
-        if can_delete:
-            options.append(
-                discord.SelectOption(
-                    label=bot._('Delete directory'),
-                    value='delete',
-                    description=bot._('Permanently delete this directory'),
-                )
-            )
         super().__init__(placeholder=bot._('Directory actions'), options=options, row=0)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
@@ -219,14 +217,30 @@ class _ActionsSelect(discord.ui.Select[FilesView]):
             await self.view.navigate(interaction, self.view.path, page=self.view.page, size_text=size_text)
         elif action == 'upload':
             await interaction.response.send_modal(_UploadModal(self.view))
+            await self._reset_selection(interaction)
         elif action == 'delete':
             await self._confirm_delete(interaction)
+            await self._reset_selection(interaction)
+
+    async def _reset_selection(self, interaction: discord.Interaction[Any]) -> None:
+        assert self.view is not None
+        if interaction.message is None:
+            return
+        self.view.render(self.view.path, page=self.view.page)
+        with contextlib.suppress(discord.HTTPException):
+            await interaction.followup.edit_message(message_id=interaction.message.id, view=self.view)
 
     async def _confirm_delete(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         files_view = self.view
         target = files_view.path.resolve()
-        if target == files_view.root or not target.is_relative_to(files_view.root):
+        if target == files_view.root:
+            await interaction.response.send_message(
+                files_view.bot._('✖ You cannot delete the root `DisManager` directory.'),
+                ephemeral=True,
+            )
+            return
+        if not target.is_relative_to(files_view.root):
             return
 
         async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
