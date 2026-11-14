@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -7,6 +8,7 @@ import discord
 
 from .embed import (
     build_files_embed,
+    compute_path_size,
     get_max_page,
     list_directory_entries,
     to_dismanager_path,
@@ -29,7 +31,7 @@ class FilesView(discord.ui.View):
         self._select_targets: list[Path] = []
         self.render(path or self.root, page=1)
 
-    def render(self, path: Path, *, page: int = 1) -> discord.Embed:
+    def render(self, path: Path, *, page: int = 1, size_text: str | None = None) -> discord.Embed:
         """Update view controls for ``path`` (file or directory) and return its embed."""
         self.path = _clamp_to_root(path, self.root)
         self.clear_items()
@@ -42,14 +44,21 @@ class FilesView(discord.ui.View):
             self.max_page = 1
             self._build_file_items()
 
-        return build_files_embed(self.path, self.root, self.page)
+        return build_files_embed(self.path, self.root, self.page, size_text=size_text)
 
-    async def navigate(self, interaction: discord.Interaction[Any], path: Path, *, page: int = 1) -> None:
+    async def navigate(
+        self,
+        interaction: discord.Interaction[Any],
+        path: Path,
+        *,
+        page: int = 1,
+        size_text: str | None = None,
+    ) -> None:
         """Render ``path`` and edit the ephemeral Files message."""
         if not interaction.response.is_done():
             await interaction.response.defer()
 
-        embed = self.render(path, page=page)
+        embed = self.render(path, page=page, size_text=size_text)
         message = interaction.message
         if message is not None:
             await interaction.followup.edit_message(
@@ -78,6 +87,8 @@ class FilesView(discord.ui.View):
         self.add_item(_BackButton(disabled=self.path == self.root))
         self.add_item(_UpdateButton())
         self.add_item(_PathButton())
+        self.add_item(_SizeButton())
+        self.add_item(_UploadButton())
 
         if self.max_page > 1:
             self._add_pagination_buttons()
@@ -172,6 +183,26 @@ class _PathButton(discord.ui.Button[FilesView]):
         await interaction.response.send_modal(_GoToPathModal(self.view))
 
 
+class _SizeButton(discord.ui.Button[FilesView]):
+    def __init__(self) -> None:
+        super().__init__(label='Size', style=discord.ButtonStyle.gray)
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        assert self.view is not None
+        await interaction.response.defer()
+        size_text = await asyncio.to_thread(compute_path_size, self.view.path)
+        await self.view.navigate(interaction, self.view.path, page=self.view.page, size_text=size_text)
+
+
+class _UploadButton(discord.ui.Button[FilesView]):
+    def __init__(self) -> None:
+        super().__init__(label='Upload', style=discord.ButtonStyle.gray)
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        assert self.view is not None
+        await interaction.response.send_modal(_UploadModal(self.view))
+
+
 class _PageButton(discord.ui.Button[FilesView]):
     def __init__(self, label: str, *, target_page: int, disabled: bool) -> None:
         super().__init__(label=label, style=discord.ButtonStyle.gray, row=2, disabled=disabled)
@@ -205,3 +236,97 @@ class _GoToPathModal(discord.ui.Modal):
             return
 
         await self._files_view.navigate(interaction, target)
+
+
+class _UploadModal(discord.ui.Modal):
+    def __init__(self, files_view: FilesView) -> None:
+        super().__init__(title=files_view.bot._('Upload files'))
+        self._files_view = files_view
+        self._overwrite: discord.ui.Checkbox[Any] = discord.ui.Checkbox(default=False)
+        self._file_upload: discord.ui.FileUpload[Any] = discord.ui.FileUpload(min_values=1, max_values=10)
+
+        self.add_item(
+            discord.ui.Label(
+                text=files_view.bot._('Overwrite?'),
+                description=files_view.bot._('Replace existing files with the same name.'),
+                component=self._overwrite,
+            )
+        )
+        self.add_item(
+            discord.ui.Label(
+                text=files_view.bot._('Files'),
+                description=files_view.bot._('Select up to 10 files to upload to the current directory.'),
+                component=self._file_upload,
+            )
+        )
+
+    async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
+        await interaction.response.defer(ephemeral=True, thinking=True)
+
+        attachments = self._file_upload.values
+        total = len(attachments)
+        status_msg = await interaction.followup.send(
+            self._files_view.bot._('Processing files...'),
+            ephemeral=True,
+            wait=True,
+        )
+
+        overwrite = self._overwrite.value
+        target_dir = self._files_view.path.resolve()
+        saved: list[str] = []
+        skipped: list[str] = []
+        failed: list[str] = []
+
+        for idx, attachment in enumerate(attachments, start=1):
+            filename = Path(attachment.filename).name
+            dest = (target_dir / filename).resolve()
+            if not filename or not dest.is_relative_to(target_dir):
+                failed.append(attachment.filename)
+            elif dest.exists() and not overwrite:
+                skipped.append(filename)
+            else:
+                try:
+                    await attachment.save(dest)
+                    saved.append(filename)
+                except (OSError, discord.HTTPException):
+                    failed.append(filename)
+
+            if idx < total:
+                await status_msg.edit(
+                    content=self._format_progress(idx, total, saved, skipped, failed),
+                )
+
+        if saved and interaction.message is not None:
+            embed = self._files_view.render(self._files_view.path, page=self._files_view.page)
+            await interaction.followup.edit_message(
+                message_id=interaction.message.id,
+                embed=embed,
+                view=self._files_view,
+            )
+
+        await status_msg.edit(content=self._format_summary(saved, skipped, failed))
+
+    def _format_progress(
+        self,
+        current: int,
+        total: int,
+        saved: list[str],
+        skipped: list[str],
+        failed: list[str],
+    ) -> str:
+        header = f'`[{current}/{total}]` {self._files_view.bot._("Processing files...")}'
+        summary = self._format_summary(saved, skipped, failed)
+        return f'{header}\n{summary}' if summary else header
+
+    def _format_summary(self, saved: list[str], skipped: list[str], failed: list[str]) -> str:
+        groups = (
+            ('✔ Uploaded:', saved),
+            ('✖ Already exists (skipped):', skipped),
+            ('✖ Failed:', failed),
+        )
+        sections = [
+            f"{self._files_view.bot._(label)}\n" + '\n'.join(f'- `{name}`' for name in names)
+            for label, names in groups
+            if names
+        ]
+        return '\n\n'.join(sections)

@@ -62,3 +62,46 @@ msgstr  "Consola"
 
 msgid   "Panel"
 msgstr  "Panel"
+
+
+### ———————————————————————————————————————
+### files
+
+msgid   "Select a file"
+msgstr  "Selecciona un archivo"
+
+msgid   "Go to path"
+msgstr  "Ir a la ruta"
+
+msgid   "Path"
+msgstr  "Ruta"
+
+msgid   "✖ The path must exist inside `DisManager`. E.g.: `DisManager/logs`."
+msgstr  "✖ La ruta debe existir dentro de `DisManager`. Ej.: `DisManager/logs`."
+
+msgid   "Upload files"
+msgstr  "Subir archivos"
+
+msgid   "Overwrite?"
+msgstr  "¿Sobrescribir?"
+
+msgid   "Replace existing files with the same name."
+msgstr  "Reemplaza los archivos existentes con el mismo nombre."
+
+msgid   "Files"
+msgstr  "Archivos"
+
+msgid   "Select up to 10 files to upload to the current directory."
+msgstr  "Selecciona hasta 10 archivos para subir al directorio actual."
+
+msgid   "✔ Uploaded:"
+msgstr  "✔ Subidos:"
+
+msgid   "✖ Already exists (skipped):"
+msgstr  "✖ Ya existen (omitidos):"
+
+msgid   "✖ Failed:"
+msgstr  "✖ Fallaron:"
+
+msgid   "Processing files..."
+msgstr  "Procesando archivos..."

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 from pathlib import Path
 
 import discord
@@ -30,7 +31,21 @@ def get_max_page(dir_count: int, file_count: int) -> int:
     return max(1, math.ceil(dir_count / 99), math.ceil(file_count / 99))
 
 
-def build_files_embed(path: Path, root: Path, page: int = 1) -> discord.Embed:
+def compute_path_size(path: Path) -> str:
+    """Compute human-readable total size of a file or directory tree."""
+    total = _get_size_bytes(path)
+    units = ('B', 'KB', 'MB', 'GB', 'TB')
+    unit_idx = min(int(math.log(total, 1024)), len(units) - 1) if total > 0 else 0
+    return f'{total / (1024**unit_idx):.1f} {units[unit_idx]}'
+
+
+def build_files_embed(
+    path: Path,
+    root: Path,
+    page: int = 1,
+    *,
+    size_text: str | None = None,
+) -> discord.Embed:
     """Build the Files navigation embed for a directory or single file."""
     embed = discord.Embed(
         title=f'> **{to_dismanager_path(path, root)}**',
@@ -38,7 +53,7 @@ def build_files_embed(path: Path, root: Path, page: int = 1) -> discord.Embed:
     )
 
     if path.is_dir():
-        _populate_directory_embed(embed, path, page)
+        _populate_directory_embed(embed, path, page, size_text=size_text)
 
     return embed
 
@@ -48,7 +63,13 @@ def build_files_embed(path: Path, root: Path, page: int = 1) -> discord.Embed:
 # =========================================
 
 
-def _populate_directory_embed(embed: discord.Embed, path: Path, page: int) -> None:
+def _populate_directory_embed(
+    embed: discord.Embed,
+    path: Path,
+    page: int,
+    *,
+    size_text: str | None = None,
+) -> None:
     try:
         dirs, files = list_directory_entries(path)
     except OSError as exc:
@@ -63,10 +84,38 @@ def _populate_directory_embed(embed: discord.Embed, path: Path, page: int) -> No
     for col in _build_columns(files, '📄', current_page):
         embed.add_field(inline=True, name='', value=col)
 
-    footer = f'Dirs: {len(dirs)} | Files: {len(files)}'
+    footer_parts = [f'Dirs: {len(dirs)}', f'Files: {len(files)}']
+    if size_text is not None:
+        footer_parts.insert(0, f'Size: {size_text}')
     if max_page > 1:
-        footer = f'{footer} | Page {current_page}/{max_page}'
-    embed.set_footer(text=footer)
+        footer_parts.append(f'Page {current_page}/{max_page}')
+    embed.set_footer(text=' | '.join(footer_parts))
+
+
+def _get_size_bytes(path: Path) -> int:
+    try:
+        if not path.is_dir():
+            return path.stat(follow_symlinks=False).st_size
+    except OSError:
+        return 0
+
+    total = 0
+    stack: list[Path] = [path]
+    while stack:
+        current = stack.pop()
+        try:
+            with os.scandir(current) as it:
+                for entry in it:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(Path(entry.path))
+                        else:
+                            total += entry.stat(follow_symlinks=False).st_size
+                    except OSError:
+                        continue
+        except OSError:
+            continue
+    return total
 
 
 def _build_columns(items: list[Path], emoji: str, page: int) -> list[str]:
