@@ -89,7 +89,7 @@ def _build_panel_embed(
 ) -> discord.Embed:
     """Build the Discord embed displaying host system metrics."""
     panel_colour = 0x2F3136
-    console_commands = ('start', 'stop', 'kill', 'restart', 'plreload')
+    console_commands = ('start', 'stop', 'kill', 'restart', 'logs', 'plreload')
     panel_commands = ('start', 'stop', 'kill', 'restart', 'plreload', 'adreload')
 
     console_cmds = ' '.join(f'`{cmd}`' for cmd in console_commands)
