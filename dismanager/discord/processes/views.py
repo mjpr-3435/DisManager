@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from ...core.processes import MAX_PROCESSES, ProcessConfig, ProcessConfigError, get_process, load_processes
+from ...core.processes import MAX_PROCESSES, ProcessConfig
 from .embed import build_processes_embed
 from .modals import DeleteProcessModal, ProcessFormModal
 
@@ -18,29 +18,20 @@ class ProcessesConfigView(discord.ui.View):
     def __init__(self, bot: DisManagerClient) -> None:
         super().__init__(timeout=None)
         self.bot = bot
-        self._processes: list[ProcessConfig] = []
         self.render()
 
     def render(self) -> discord.Embed:
-        """Reload persisted processes, rebuild controls, and return the embed."""
+        """Rebuild controls from the client's process list and return the embed."""
         self.clear_items()
-        error_text: str | None = None
-        try:
-            self._processes = load_processes()
-        except ProcessConfigError as exc:
-            self._processes = []
-            error_text = f'✖ {exc}'
+        processes = self.bot.processes
 
-        if self._processes:
-            self.add_item(_ProcessSelect(self.bot, self._processes))
+        if processes:
+            self.add_item(_ProcessSelect(self.bot, processes))
 
-        self.add_item(_NewProcessButton(self.bot, disabled=len(self._processes) >= MAX_PROCESSES))
-        self.add_item(_DeleteProcessButton(self.bot, disabled=not self._processes))
+        self.add_item(_NewProcessButton(self.bot, disabled=len(processes) >= MAX_PROCESSES))
+        self.add_item(_DeleteProcessButton(self.bot, disabled=not processes))
 
-        embed = build_processes_embed(self._processes, self.bot._)
-        if error_text is not None:
-            embed.description = f'```\n{error_text}```'
-        return embed
+        return build_processes_embed(processes, self.bot._)
 
     async def refresh(self, interaction: discord.Interaction[Any]) -> None:
         """Re-render the view and update the ephemeral Processes message."""
@@ -69,7 +60,7 @@ class _ProcessSelect(discord.ui.Select[ProcessesConfigView]):
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        existing = get_process(self.values[0])
+        existing = self.view.bot.get_process_config(self.values[0])
         if existing is None:
             await self.view.refresh(interaction)
             return
@@ -92,7 +83,7 @@ class _DeleteProcessButton(discord.ui.Button[ProcessesConfigView]):
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        processes = load_processes()
+        processes = self.view.bot.processes
         if not processes:
             await self.view.refresh(interaction)
             return

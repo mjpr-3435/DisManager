@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import shutil
 import time
+from pathlib import Path
+from typing import Literal
 
 import aiohttp
 import discord
@@ -13,6 +16,14 @@ from ..core.config import DisManagerConfig
 from ..core.console import build_console_handler, console_loop
 from ..core.i18n import Translator
 from ..core.logs import mute_console_logging
+from ..core.processes import (
+    ProcessConfig,
+    ProcessConfigError,
+    ProcessDeleteRequest,
+    delete_process,
+    load_processes,
+    upsert_process,
+)
 from .commands import setup as setup_commands
 from .panel import PanelView, update_panel
 from .utils import get_or_create_thread
@@ -30,6 +41,7 @@ class DisManagerClient(commands.Bot):
         self.config = config
         self._ = translator
         self.logger = logging.getLogger(__name__)
+        self.processes: list[ProcessConfig] = load_processes()
         self.panel: discord.TextChannel | None = None
         self._panel_message: discord.Message | None = None
         self.error_thread: discord.Thread | None = None
@@ -166,3 +178,44 @@ class DisManagerClient(commands.Bot):
             )
             with contextlib.suppress(Exception):
                 await self.error_thread.send(f'⚠ **[{context}]** {notice}')
+
+    def get_process_config(self, name: str) -> ProcessConfig | None:
+        """Return a configured process from the client's in-memory state."""
+        target = name.strip().casefold()
+        return next((proc for proc in self.processes if proc.name.casefold() == target), None)
+
+    def on_processes_edit(
+        self,
+        event: Literal['new', 'update', 'delete'],
+        payload: ProcessConfig | ProcessDeleteRequest,
+    ) -> None:
+        """Persist process changes, update client state, and handle folder side effects."""
+        if event == 'new':
+            assert isinstance(payload, ProcessConfig)
+            self.processes = upsert_process(payload, is_edit=False)
+            try:
+                payload.resolve_path().mkdir(parents=True, exist_ok=True)
+            except OSError as exc:
+                raise ProcessConfigError(f"Could not create process folder '{payload.name}': {exc}") from exc
+            return
+
+        if event == 'update':
+            assert isinstance(payload, ProcessConfig)
+            self.processes = upsert_process(payload, is_edit=True)
+            return
+
+        if event == 'delete':
+            assert isinstance(payload, ProcessDeleteRequest)
+            target_proc = self.get_process_config(payload.name)
+            self.processes = delete_process(payload.name)
+            if payload.delete_files and target_proc is not None:
+                root = Path.cwd().resolve()
+                target_dir = target_proc.resolve_path(root).resolve()
+                if target_dir != root and target_dir.is_relative_to(root) and target_dir.exists():
+                    try:
+                        shutil.rmtree(target_dir)
+                    except OSError as exc:
+                        raise ProcessConfigError(f"Could not delete process folder '{payload.name}': {exc}") from exc
+            return
+
+        raise ValueError(f'Unsupported process edit event: {event}')

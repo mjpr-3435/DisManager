@@ -366,3 +366,9 @@ msgstr  "Configuración de Procesos"
 
 msgid   "Configure the processes managed by DisManager. Each process automatically uses a folder matching its name inside `DisManager/`.\n\n• Select a process from the menu to inspect or edit its settings.\n• Use **New** to register a process (up to 15) or **Delete** to remove one."
 msgstr  "Configura los procesos administrados por DisManager. Cada proceso usa automáticamente una carpeta con su mismo nombre dentro de `DisManager/`.\n\n• Selecciona un proceso en el menú para inspeccionar o editar su configuración.\n• Usa **Nuevo** para registrar un proceso (hasta 15) o **Eliminar** para quitar uno."
+
+msgid   "Delete process folder too"
+msgstr  "Eliminar también la carpeta del proceso"
+
+msgid   "This will ALSO permanently delete `DisManager/{}` and all its files. Are you sure?"
+msgstr  "Esto TAMBIÉN eliminará permanentemente `DisManager/{}` y todos sus archivos. ¿Estás seguro?"

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -12,6 +13,7 @@ PROCESSES_FILE = DATA_DIR / 'processes.json'
 MAX_PROCESSES = 15
 
 _INVALID_NAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_logger = logging.getLogger(__name__)
 
 
 class ProcessConfigError(Exception):
@@ -31,6 +33,14 @@ class ProcessConfig:
         """Resolve the working directory path automatically from the process name."""
         base = (root or Path.cwd()).resolve()
         return base / self.name
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessDeleteRequest:
+    """Payload describing a process deletion and optional folder cleanup."""
+
+    name: str
+    delete_files: bool = False
 
 
 def validate_process_data(
@@ -56,35 +66,64 @@ def validate_process_data(
 
 
 def load_processes(path: str | Path = PROCESSES_FILE) -> list[ProcessConfig]:
-    """Load and validate all persisted process definitions from disk."""
+    """Load persisted processes, auto-repairing corrupt, duplicate, or excess entries."""
     file_path = Path(path)
     if not file_path.exists():
         return []
 
     try:
         raw_text = file_path.read_text(encoding='utf-8')
-    except OSError as exc:
-        raise ProcessConfigError(f"Could not read '{file_path}': {exc}") from exc
-
-    try:
         data: object = json.loads(raw_text)
-    except json.JSONDecodeError as exc:
-        raise ProcessConfigError(f"Invalid JSON in '{file_path}': {exc}") from exc
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.warning("Resetting unreadable process store '%s': %s", file_path, exc)
+        _safe_reset_store(file_path)
+        return []
 
     if not isinstance(data, list):
-        raise ProcessConfigError(f"Process store '{file_path}' must contain a JSON array.")
+        _logger.warning("Resetting invalid process store '%s': root must be a JSON array.", file_path)
+        _safe_reset_store(file_path)
+        return []
 
     processes: list[ProcessConfig] = []
     seen_names: set[str] = set()
+    needs_repair = False
+
     for idx, item in enumerate(data):
-        config = _parse_process_entry(item, index=idx)
+        try:
+            config = _parse_process_entry(item, index=idx)
+        except ProcessConfigError as exc:
+            _logger.warning("Discarding invalid entry in '%s': %s", file_path, exc)
+            needs_repair = True
+            continue
+
         key = config.name.casefold()
         if key in seen_names:
-            raise ProcessConfigError(f"Duplicate process name '{config.name}' in '{file_path}'.")
+            _logger.warning("Discarding duplicate process '%s' in '%s'.", config.name, file_path)
+            needs_repair = True
+            continue
+
         seen_names.add(key)
         processes.append(config)
 
+    if len(processes) > MAX_PROCESSES:
+        _logger.warning("Purging %d excess process(es) in '%s'.", len(processes) - MAX_PROCESSES, file_path)
+        processes = processes[:MAX_PROCESSES]
+        needs_repair = True
+
+    if needs_repair:
+        try:
+            save_processes(processes, file_path)
+        except ProcessConfigError as exc:
+            _logger.warning("Could not save repaired process store '%s': %s", file_path, exc)
+
     return processes
+
+
+def _safe_reset_store(file_path: Path) -> None:
+    try:
+        save_processes([], file_path)
+    except ProcessConfigError as exc:
+        _logger.warning("Could not reset process store '%s': %s", file_path, exc)
 
 
 def save_processes(processes: Sequence[ProcessConfig], path: str | Path = PROCESSES_FILE) -> None:

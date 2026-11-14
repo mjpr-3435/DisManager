@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import discord
 
-from ...core.processes import ProcessConfig, ProcessConfigError, delete_process, upsert_process, validate_process_data
+from ...core.processes import ProcessConfig, ProcessConfigError, ProcessDeleteRequest, validate_process_data
 from ..utils import confirmation_request
 
 if TYPE_CHECKING:
@@ -63,6 +63,7 @@ class ProcessFormModal(discord.ui.Modal):
         name = self._existing.name if self._existing is not None else (
             self._name_input.value if self._name_input is not None else ''
         )
+        event: Literal['new', 'update'] = 'update' if self._existing is not None else 'new'
         try:
             config = validate_process_data(
                 name=name,
@@ -70,7 +71,7 @@ class ProcessFormModal(discord.ui.Modal):
                 stop_command=self._stop_input.value,
                 blacklist=self._blacklist_input.value,
             )
-            upsert_process(config, is_edit=self._existing is not None)
+            self._processes_view.bot.on_processes_edit(event, config)
         except ProcessConfigError as exc:
             await interaction.response.send_message(f'✖ {exc}', ephemeral=True)
             return
@@ -79,7 +80,7 @@ class ProcessFormModal(discord.ui.Modal):
 
 
 class DeleteProcessModal(discord.ui.Modal):
-    """Modal with a process selector to delete a persisted process."""
+    """Modal with a process selector and folder-deletion checkbox."""
 
     def __init__(
         self,
@@ -95,14 +96,18 @@ class DeleteProcessModal(discord.ui.Modal):
         self._process_select: discord.ui.Select[Any] = discord.ui.Select(
             options=[discord.SelectOption(label=proc.name[:100], value=proc.name) for proc in processes[:25]]
         )
+        self._delete_files_checkbox: discord.ui.Checkbox[Any] = discord.ui.Checkbox(default=False)
         self.add_item(discord.ui.Label(text=bot._('Process'), component=self._process_select))
+        self.add_item(discord.ui.Label(text=bot._('Delete process folder too'), component=self._delete_files_checkbox))
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
+        bot = self._processes_view.bot
         target_name = self._process_select.values[0]
+        delete_files = self._delete_files_checkbox.value
 
-        async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
+        async def finalize_delete(confirm_interaction: discord.Interaction[Any]) -> None:
             try:
-                delete_process(target_name)
+                bot.on_processes_edit('delete', ProcessDeleteRequest(target_name, delete_files=delete_files))
             except ProcessConfigError as exc:
                 await confirm_interaction.response.edit_message(content=f'✖ {exc}', embed=None, view=None)
                 return
@@ -116,8 +121,41 @@ class DeleteProcessModal(discord.ui.Modal):
                     view=self._processes_view,
                 )
 
+        async def on_first_confirmation(first_confirm: discord.Interaction[Any]) -> None:
+            if not delete_files:
+                await finalize_delete(first_confirm)
+                return
+
+            class SecondConfirmView(discord.ui.View):
+                def __init__(self) -> None:
+                    super().__init__(timeout=120)
+
+                @discord.ui.button(label='✔', style=discord.ButtonStyle.red)
+                async def confirm_button(
+                    self,
+                    btn_interaction: discord.Interaction[Any],
+                    _button: discord.ui.Button[Any],
+                ) -> None:
+                    await finalize_delete(btn_interaction)
+
+                @discord.ui.button(label='✖', style=discord.ButtonStyle.gray)
+                async def cancel_button(
+                    self,
+                    btn_interaction: discord.Interaction[Any],
+                    _button: discord.ui.Button[Any],
+                ) -> None:
+                    await btn_interaction.response.edit_message(delete_after=0)
+
+            warning = bot._(
+                'This will ALSO permanently delete `DisManager/{}` and all its files. Are you sure?'
+            ).format(target_name)
+            await first_confirm.response.edit_message(
+                embed=discord.Embed(description=warning, colour=0x2F3136),
+                view=SecondConfirmView(),
+            )
+
         await confirmation_request(
-            self._processes_view.bot._("Are you sure you want to delete process '{}'?").format(target_name),
+            bot._("Are you sure you want to delete process '{}'?").format(target_name),
             interaction=interaction,
-            on_confirmation=on_confirmation,
+            on_confirmation=on_first_confirmation,
         )
