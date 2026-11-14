@@ -60,6 +60,7 @@ class _RestartButton(discord.ui.Button[PanelView]):
                 embed=None,
                 view=None,
             )
+            await confirm_interaction.delete_original_response()
             await self.bot.request_restart()
 
         await confirmation_request(
