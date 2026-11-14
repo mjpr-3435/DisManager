@@ -3,9 +3,11 @@ from __future__ import annotations
 import sys
 from importlib.metadata import version
 
-from .client import DisManagerClient
-from .config import ConfigError, load_config
-from .i18n import load_translator
+from .core.config import ConfigError, load_config
+from .core.i18n import load_translator
+from .core.logs import setup_logging
+from .core.paths import ensure_workspace_dirs
+from .discord.client import DisManagerClient
 
 
 def run() -> None:
@@ -16,6 +18,8 @@ def run() -> None:
         print(f'Configuration error: {exc}', file=sys.stderr)
         sys.exit(1)
 
+    ensure_workspace_dirs()
+    setup_logging()
     translate = load_translator(config.language)
     print(translate('Your configuration has been loaded successfully.'))
 

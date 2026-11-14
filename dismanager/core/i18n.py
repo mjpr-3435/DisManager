@@ -6,7 +6,7 @@ from pathlib import Path
 
 Translator = Callable[[str], str]
 
-LOCALES_DIR = Path(__file__).resolve().parent / 'locales'
+LOCALES_DIR = Path(__file__).resolve().parent.parent / 'locales'
 
 
 def load_translator(language: str) -> Translator:
