@@ -15,7 +15,7 @@ def build_guide_embed() -> discord.Embed:
         url='https://github.com/mjpr-3435/DisManager',
         description=(
             'The guide will be implemented soon, but in the meantime, you can find it on GitHub.'
-            '\n\nPorted by Gemini 4 Hydrogen based on McDis RCON (by KassiuLo & Eli y ya).'
+            '\n\nPorted by Gemini 4 Hydrogen based on McDis RCON.'
         ),
     )
     embed.set_image(url='https://i.imgur.com/phe4JAf.png')
