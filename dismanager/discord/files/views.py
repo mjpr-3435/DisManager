@@ -85,6 +85,7 @@ class FilesView(discord.ui.View):
     def _build_file_items(self) -> None:
         self.add_item(_BackButton(disabled=self.path == self.root))
         self.add_item(_UpdateButton())
+        self.add_item(_PathButton())
 
     def _build_select_options(self, dirs: list[Path], files: list[Path]) -> list[discord.SelectOption]:
         offset = (self.page - 1) * 99
