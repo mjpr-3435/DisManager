@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 import discord
@@ -58,6 +59,8 @@ def build_files_embed(
 
     if path.is_dir():
         _populate_directory_embed(embed, path, page, size_text=size_text)
+    else:
+        _populate_file_embed(embed, path)
 
     return embed
 
@@ -94,6 +97,18 @@ def _populate_directory_embed(
     if max_page > 1:
         footer_parts.append(f'Page {current_page}/{max_page}')
     embed.set_footer(text=' | '.join(footer_parts))
+
+
+def _populate_file_embed(embed: discord.Embed, path: Path) -> None:
+    try:
+        stat = path.stat(follow_symlinks=False)
+    except OSError as exc:
+        embed.description = f'```\n{exc}```'
+        return
+
+    size = format_bytes(stat.st_size)
+    modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).astimezone().strftime('%Y-%m-%d %H:%M')
+    embed.set_footer(text=f'Size: {size} | Modified: {modified}')
 
 
 def _get_size_bytes(path: Path) -> int:
