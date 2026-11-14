@@ -42,6 +42,12 @@ msgstr  "Comando no reconocido: '{}'."
 msgid   "Closing DisManager..."
 msgstr  "Cerrando DisManager..."
 
+msgid   "Are you sure you want to restart DisManager?"
+msgstr  "¿Seguro que quieres reiniciar DisManager?"
+
+msgid   "Restarting..."
+msgstr  "Reiniciando..."
+
 ### ———————————————————————————————————————
 ### panel
 

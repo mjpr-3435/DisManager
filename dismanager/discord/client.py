@@ -14,7 +14,7 @@ from ..core.console import build_console_handler, console_loop
 from ..core.i18n import Translator
 from ..core.logs import mute_console_logging
 from .commands import setup as setup_commands
-from .panel import update_panel
+from .panel import PanelView, update_panel
 from .threads import get_or_create_thread
 
 PANEL_REFRESH_SECONDS = 15
@@ -34,6 +34,7 @@ class DisManagerClient(commands.Bot):
         self.error_thread: discord.Thread | None = None
         self._ready_once = False
         self._closing = False
+        self.should_restart = False
         self._panel_task: asyncio.Task[None] | None = None
         self._console_task: asyncio.Task[None] | None = None
         self._last_error_notice: dict[str, float] = {}
@@ -83,10 +84,19 @@ class DisManagerClient(commands.Bot):
         return channel
 
     async def _panel_loop(self) -> None:
+        include_view = True
         while not self.is_closed():
             if self.panel is not None and self.user is not None:
                 try:
-                    await update_panel(self.panel, self.user.id, self.config.bot_prefix, self._)
+                    view = PanelView(self) if include_view else None
+                    await update_panel(
+                        self.panel,
+                        self.user.id,
+                        self.config.bot_prefix,
+                        self._,
+                        view=view,
+                    )
+                    include_view = False
                 except (aiohttp.ClientError, discord.HTTPException):
                     with contextlib.suppress(Exception):
                         fetched = await self.fetch_channel(self.panel.id)
@@ -118,6 +128,11 @@ class DisManagerClient(commands.Bot):
                 await self._panel_task
 
         await super().close()
+
+    async def request_restart(self) -> None:
+        """Shut down via the unified close flow and signal the runner to relaunch."""
+        self.should_restart = True
+        await self.close()
 
     async def report_error(self, context: str) -> None:
         """Log the active exception traceback to file and send a rate-limited notice to Error Reports."""

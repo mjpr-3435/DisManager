@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import subprocess
 import sys
 from importlib.metadata import version
 
@@ -29,3 +31,13 @@ def run() -> None:
     except Exception as exc:
         print(translate('Error while running discord client: {}').format(exc), file=sys.stderr)
         sys.exit(1)
+
+    if client.should_restart:
+        _relaunch()
+
+
+def _relaunch() -> None:
+    cmd = [sys.executable, '-m', 'dismanager.cli', *sys.argv[1:]]
+    if os.name == 'nt':
+        sys.exit(subprocess.call(cmd))
+    os.execv(sys.executable, cmd)

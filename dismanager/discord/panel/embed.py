@@ -10,7 +10,7 @@ from typing import Protocol, cast
 import discord
 import psutil
 
-from ..core.i18n import Translator
+from ...core.i18n import Translator
 
 
 async def update_panel(
@@ -18,11 +18,13 @@ async def update_panel(
     bot_user_id: int,
     bot_prefix: str,
     translator: Translator,
+    *,
+    view: discord.ui.View | None = None,
 ) -> discord.Message:
     """Collect host metrics and publish or update the DisManager panel embed."""
     metrics = await asyncio.to_thread(_collect_system_metrics)
     embed = _build_panel_embed(metrics, bot_prefix, translator)
-    return await _publish_or_update_panel(channel, bot_user_id, embed)
+    return await _publish_or_update_panel(channel, bot_user_id, embed, view=view)
 
 
 # =========================================
@@ -138,19 +140,23 @@ async def _publish_or_update_panel(
     channel: discord.TextChannel,
     bot_user_id: int,
     embed: discord.Embed,
+    *,
+    view: discord.ui.View | None = None,
 ) -> discord.Message:
     """Publish the panel embed or update the existing bot message in the channel."""
     messages = [msg async for msg in channel.history(limit=None, oldest_first=True)]
 
     if not messages:
-        return await channel.send(embed=embed)
+        return await channel.send(embed=embed, view=view) if view is not None else await channel.send(embed=embed)
 
     if messages[0].author.id != bot_user_id or not messages[0].embeds:
         while messages:
             await channel.purge()
             messages = [msg async for msg in channel.history(limit=None, oldest_first=True)]
-        return await channel.send(embed=embed)
+        return await channel.send(embed=embed, view=view) if view is not None else await channel.send(embed=embed)
 
+    if view is not None:
+        return await messages[0].edit(embed=embed, view=view)
     return await messages[0].edit(embed=embed)
 
 
