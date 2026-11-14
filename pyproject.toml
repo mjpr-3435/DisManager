@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 
 dependencies = [
     "discord-py>=2.7.1",
+    "psutil>=7.2.2",
     "ruamel-yaml>=0.19.1",
 ]
 
@@ -18,6 +19,7 @@ dev = [
     "mypy>=1.20.0",
     "pyright>=1.1.410",
     "ruff>=0.15.8",
+    "types-psutil>=7.2.2.20260408",
 ]
 
 [tool.mypy]

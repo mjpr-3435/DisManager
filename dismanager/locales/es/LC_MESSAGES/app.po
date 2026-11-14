@@ -23,3 +23,36 @@ msgstr  "Error: El canal del panel debe ser un canal de texto."
 
 msgid   "Logged in as {}!"
 msgstr  "Sesión iniciada como {}!"
+
+msgid   "Unexpected error. Use `{}log` to inspect the log."
+msgstr  "Error inesperado. Usa `{}log` para revisar el registro."
+
+msgid   "The log file is currently empty."
+msgstr  "El archivo de registro está vacío por el momento."
+
+msgid   "Commands"
+msgstr  "Comandos"
+
+msgid   "Command '{}' is not implemented yet."
+msgstr  "El comando '{}' aún no está implementado."
+
+msgid   "Unknown command: '{}'."
+msgstr  "Comando no reconocido: '{}'."
+
+msgid   "Closing DisManager..."
+msgstr  "Cerrando DisManager..."
+
+### ———————————————————————————————————————
+### panel
+
+msgid   "DisManager Panel"
+msgstr  "Panel de DisManager"
+
+msgid   "Here you will find an overview of the server resource usage. Additionally, DisManager recognizes the following commands in the following instances:\n"
+msgstr  "Acá encontrarás una vista general del uso de recursos del servidor. Además, DisManager reconoce los siguientes comandos en las siguientes instancias:\n"
+
+msgid   "Console"
+msgstr  "Consola"
+
+msgid   "Panel"
+msgstr  "Panel"
