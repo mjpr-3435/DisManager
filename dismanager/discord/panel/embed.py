@@ -19,11 +19,12 @@ async def update_panel(
     bot_prefix: str,
     translator: Translator,
     *,
+    error_thread: discord.Thread | None = None,
     view: discord.ui.View | None = None,
 ) -> discord.Message:
     """Collect host metrics and publish or update the DisManager panel embed."""
     metrics = await asyncio.to_thread(_collect_system_metrics)
-    embed = _build_panel_embed(metrics, bot_prefix, translator)
+    embed = _build_panel_embed(metrics, bot_prefix, translator, error_thread=error_thread)
     return await _publish_or_update_panel(channel, bot_user_id, embed, view=view)
 
 
@@ -83,6 +84,8 @@ def _build_panel_embed(
     metrics: _SystemMetrics,
     bot_prefix: str,
     translator: Translator,
+    *,
+    error_thread: discord.Thread | None = None,
 ) -> discord.Embed:
     """Build the Discord embed displaying host system metrics."""
     panel_colour = 0x2F3136
@@ -99,6 +102,8 @@ def _build_panel_embed(
         + f'- {translator("Console")} : {console_cmds}\n'
         + f'- {translator("Panel")} : {panel_cmds}'
     )
+    if error_thread is not None:
+        description += f'\n- {translator("Error Reports")} : {error_thread.mention}'
 
     embed = discord.Embed(
         title=translator('DisManager Panel'),
@@ -132,7 +137,7 @@ def _build_panel_embed(
             ('Load', metrics.disk_load),
         ]),
     )
-    embed.set_footer(text=f"DisManager v{version('dismanager')}  •  RAM: {metrics.app_ram}")
+    embed.set_footer(text=f"🟢 DisManager v{version('dismanager')}  •  RAM: {metrics.app_ram}")
     return embed
 
 

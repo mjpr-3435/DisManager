@@ -31,6 +31,7 @@ class DisManagerClient(commands.Bot):
         self._ = translator
         self.logger = logging.getLogger(__name__)
         self.panel: discord.TextChannel | None = None
+        self._panel_message: discord.Message | None = None
         self.error_thread: discord.Thread | None = None
         self._ready_once = False
         self._closing = False
@@ -89,11 +90,12 @@ class DisManagerClient(commands.Bot):
             if self.panel is not None and self.user is not None:
                 try:
                     view = PanelView(self) if include_view else None
-                    await update_panel(
+                    self._panel_message = await update_panel(
                         self.panel,
                         self.user.id,
                         self.config.bot_prefix,
                         self._,
+                        error_thread=self.error_thread,
                         view=view,
                     )
                     include_view = False
@@ -127,7 +129,17 @@ class DisManagerClient(commands.Bot):
             with contextlib.suppress(asyncio.CancelledError):
                 await self._panel_task
 
+        await self._mark_panel_offline()
         await super().close()
+
+    async def _mark_panel_offline(self) -> None:
+        if self._panel_message is None or not self._panel_message.embeds:
+            return
+        embed = self._panel_message.embeds[0].copy()
+        footer_text = embed.footer.text or 'DisManager'
+        embed.set_footer(text=f"🔴 {footer_text.removeprefix('🟢 ')}")
+        with contextlib.suppress(Exception):
+            await self._panel_message.edit(embed=embed)
 
     async def request_restart(self) -> None:
         """Shut down via the unified close flow and signal the runner to relaunch."""
