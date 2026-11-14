@@ -1,3 +1,1 @@
-from .embed import build_guide_embed
-
-__all__ = ['build_guide_embed']
+from .embed import build_guide_embed as build_guide_embed
