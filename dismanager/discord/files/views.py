@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import discord
 
+from ..utils import confirmation_request
 from .embed import (
     build_files_embed,
     compute_path_size,
@@ -80,15 +82,15 @@ class FilesView(discord.ui.View):
         self.max_page = get_max_page(len(dirs), len(files))
         self.page = min(max(page, 1), self.max_page)
 
+        self.add_item(_ActionsSelect(self.bot, can_delete=self.path != self.root))
+
         options = self._build_select_options(dirs, files)
         if options:
             self.add_item(_FileSelect(self.bot._('Select a file'), options))
 
-        self.add_item(_BackButton(disabled=self.path == self.root))
-        self.add_item(_UpdateButton())
-        self.add_item(_PathButton())
-        self.add_item(_SizeButton())
-        self.add_item(_UploadButton())
+        self.add_item(_BackButton(disabled=self.path == self.root, row=2))
+        self.add_item(_UpdateButton(row=2))
+        self.add_item(_PathButton(row=2))
 
         if self.max_page > 1:
             self._add_pagination_buttons()
@@ -148,7 +150,7 @@ def _resolve_dismanager_path(raw_path: str, root: Path) -> Path | None:
 
 class _FileSelect(discord.ui.Select[FilesView]):
     def __init__(self, placeholder: str, options: list[discord.SelectOption]) -> None:
-        super().__init__(placeholder=placeholder, options=options)
+        super().__init__(placeholder=placeholder, options=options, row=1)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -157,8 +159,8 @@ class _FileSelect(discord.ui.Select[FilesView]):
 
 
 class _BackButton(discord.ui.Button[FilesView]):
-    def __init__(self, *, disabled: bool = False) -> None:
-        super().__init__(label='⬅️', style=discord.ButtonStyle.gray, disabled=disabled)
+    def __init__(self, *, disabled: bool = False, row: int | None = None) -> None:
+        super().__init__(label='⬅️', style=discord.ButtonStyle.gray, disabled=disabled, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -166,8 +168,8 @@ class _BackButton(discord.ui.Button[FilesView]):
 
 
 class _UpdateButton(discord.ui.Button[FilesView]):
-    def __init__(self) -> None:
-        super().__init__(label='🔄', style=discord.ButtonStyle.gray)
+    def __init__(self, *, row: int | None = None) -> None:
+        super().__init__(label='🔄', style=discord.ButtonStyle.gray, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -175,37 +177,84 @@ class _UpdateButton(discord.ui.Button[FilesView]):
 
 
 class _PathButton(discord.ui.Button[FilesView]):
-    def __init__(self) -> None:
-        super().__init__(label='📌', style=discord.ButtonStyle.gray)
+    def __init__(self, *, row: int | None = None) -> None:
+        super().__init__(label='📌', style=discord.ButtonStyle.gray, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         await interaction.response.send_modal(_GoToPathModal(self.view))
 
 
-class _SizeButton(discord.ui.Button[FilesView]):
-    def __init__(self) -> None:
-        super().__init__(label='Size', style=discord.ButtonStyle.gray)
+class _ActionsSelect(discord.ui.Select[FilesView]):
+    def __init__(self, bot: DisManagerClient, *, can_delete: bool) -> None:
+        options = [
+            discord.SelectOption(
+                label=bot._('Calculate size'),
+                value='size',
+                description=bot._('Compute total size of this directory'),
+            ),
+            discord.SelectOption(
+                label=bot._('Upload files'),
+                value='upload',
+                description=bot._('Upload up to 10 files to this directory'),
+            ),
+        ]
+        if can_delete:
+            options.append(
+                discord.SelectOption(
+                    label=bot._('Delete directory'),
+                    value='delete',
+                    description=bot._('Permanently delete this directory'),
+                )
+            )
+        super().__init__(placeholder=bot._('Directory actions'), options=options, row=0)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        await interaction.response.defer()
-        size_text = await asyncio.to_thread(compute_path_size, self.view.path)
-        await self.view.navigate(interaction, self.view.path, page=self.view.page, size_text=size_text)
+        action = self.values[0]
 
+        if action == 'size':
+            await interaction.response.defer()
+            size_text = await asyncio.to_thread(compute_path_size, self.view.path)
+            await self.view.navigate(interaction, self.view.path, page=self.view.page, size_text=size_text)
+        elif action == 'upload':
+            await interaction.response.send_modal(_UploadModal(self.view))
+        elif action == 'delete':
+            await self._confirm_delete(interaction)
 
-class _UploadButton(discord.ui.Button[FilesView]):
-    def __init__(self) -> None:
-        super().__init__(label='Upload', style=discord.ButtonStyle.gray)
-
-    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+    async def _confirm_delete(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        await interaction.response.send_modal(_UploadModal(self.view))
+        files_view = self.view
+        target = files_view.path.resolve()
+        if target == files_view.root or not target.is_relative_to(files_view.root):
+            return
+
+        async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
+            try:
+                await asyncio.to_thread(shutil.rmtree, target)
+            except OSError as exc:
+                await confirm_interaction.response.edit_message(
+                    content=files_view.bot._('✖ Could not delete directory: {}').format(exc),
+                    embed=None,
+                    view=None,
+                )
+                return
+
+            await confirm_interaction.response.edit_message(delete_after=0)
+            await files_view.navigate(interaction, target.parent)
+
+        await confirmation_request(
+            files_view.bot._('Are you sure you want to delete `{}`?').format(
+                to_dismanager_path(target, files_view.root)
+            ),
+            interaction=interaction,
+            on_confirmation=on_confirmation,
+        )
 
 
 class _PageButton(discord.ui.Button[FilesView]):
     def __init__(self, label: str, *, target_page: int, disabled: bool) -> None:
-        super().__init__(label=label, style=discord.ButtonStyle.gray, row=2, disabled=disabled)
+        super().__init__(label=label, style=discord.ButtonStyle.gray, row=3, disabled=disabled)
         self._target_page = target_page
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:

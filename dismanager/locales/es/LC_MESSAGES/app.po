@@ -105,3 +105,27 @@ msgstr  "✖ Fallaron:"
 
 msgid   "Processing files..."
 msgstr  "Procesando archivos..."
+
+msgid   "Directory actions"
+msgstr  "Acciones de carpeta"
+
+msgid   "Calculate size"
+msgstr  "Calcular tamaño"
+
+msgid   "Compute total size of this directory"
+msgstr  "Calcula el tamaño total de esta carpeta"
+
+msgid   "Upload up to 10 files to this directory"
+msgstr  "Sube hasta 10 archivos a esta carpeta"
+
+msgid   "Delete directory"
+msgstr  "Eliminar carpeta"
+
+msgid   "Permanently delete this directory"
+msgstr  "Elimina permanentemente esta carpeta"
+
+msgid   "Are you sure you want to delete `{}`?"
+msgstr  "¿Seguro que quieres eliminar `{}`?"
+
+msgid   "✖ Could not delete directory: {}"
+msgstr  "✖ No se pudo eliminar la carpeta: {}"
