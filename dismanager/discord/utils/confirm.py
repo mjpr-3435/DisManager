@@ -5,18 +5,16 @@ from typing import Any
 
 import discord
 
-EMBED_COLOUR = 0x2F3136
+_EMBED_COLOUR = 0x2F3136
 
-InteractionCallback = Callable[[discord.Interaction[Any]], Awaitable[None]]
+_InteractionCallback = Callable[[discord.Interaction[Any]], Awaitable[None]]
 
 
 async def confirmation_request(
     description: str,
     *,
     interaction: discord.Interaction[Any],
-    on_confirmation: InteractionCallback,
-    on_reject: InteractionCallback | None = None,
-    ephemeral: bool = True,
+    on_confirmation: _InteractionCallback,
 ) -> None:
     """Send an ephemeral confirmation prompt with ✔ and ✖ buttons."""
 
@@ -38,13 +36,10 @@ async def confirmation_request(
             btn_interaction: discord.Interaction[Any],
             _button: discord.ui.Button[Any],
         ) -> None:
-            if on_reject is None:
-                await btn_interaction.response.edit_message(delete_after=0)
-                return
-            await on_reject(btn_interaction)
+            await btn_interaction.response.edit_message(delete_after=0)
 
     await interaction.response.send_message(
-        embed=discord.Embed(description=description, colour=EMBED_COLOUR),
+        embed=discord.Embed(description=description, colour=_EMBED_COLOUR),
         view=ConfirmationView(),
-        ephemeral=ephemeral,
+        ephemeral=True,
     )

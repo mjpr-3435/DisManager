@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from .client import DisManagerClient
 
 
-class BotCommands(commands.Cog):
+class _BotCommands(commands.Cog):
     """Discord text commands for DisManager."""
 
     def __init__(self, bot: DisManagerClient) -> None:
@@ -34,4 +34,4 @@ class BotCommands(commands.Cog):
 
 async def setup(bot: DisManagerClient) -> None:
     """Register DisManager Discord commands on the bot."""
-    await bot.add_cog(BotCommands(bot))
+    await bot.add_cog(_BotCommands(bot))

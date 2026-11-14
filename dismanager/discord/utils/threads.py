@@ -6,8 +6,6 @@ import discord
 async def get_or_create_thread(
     channel: discord.TextChannel,
     name: str,
-    *,
-    public: bool = True,
 ) -> discord.Thread:
     """Return an existing thread by name (unarchiving if needed) or create a new one."""
     target_name = name.strip()
@@ -21,7 +19,4 @@ async def get_or_create_thread(
             await archived.edit(archived=False)
             return archived
 
-    thread_type = (
-        discord.ChannelType.public_thread if public else discord.ChannelType.private_thread
-    )
-    return await channel.create_thread(name=target_name, type=thread_type)
+    return await channel.create_thread(name=target_name, type=discord.ChannelType.public_thread)

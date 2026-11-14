@@ -6,13 +6,13 @@ from pathlib import Path
 
 from .main import run
 
-TEMPLATES_DIR = Path(__file__).resolve().parent / 'templates'
+_TEMPLATES_DIR = Path(__file__).resolve().parent / 'templates'
 
 
 def init() -> None:
     """Initialize the project by copying the default configuration template."""
     target = Path('config.yml')
-    source = TEMPLATES_DIR / 'config.yml'
+    source = _TEMPLATES_DIR / 'config.yml'
     if not target.exists():
         shutil.copy(source, target)
 

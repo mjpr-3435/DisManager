@@ -24,9 +24,9 @@ class DisManagerConfig:
     backups     : int
 
 
-def load_config(path: str | Path = 'config.yml') -> DisManagerConfig:
+def load_config() -> DisManagerConfig:
     """Load and validate a YAML configuration file from disk."""
-    config_path = Path(path)
+    config_path = Path('config.yml')
     yaml = YAML(typ='safe')
 
     try:

@@ -17,15 +17,15 @@ if TYPE_CHECKING:
 class FilesView(discord.ui.View):
     """Interactive file-navigation view with directory/file bifurcation."""
 
-    def __init__(self, bot: DisManagerClient, path: Path | None = None, *, root: Path | None = None) -> None:
+    def __init__(self, bot: DisManagerClient) -> None:
         super().__init__(timeout=None)
         self.bot = bot
-        self.root = (root or Path.cwd()).resolve()
+        self.root = Path.cwd().resolve()
         self.path = self.root
         self.page = 1
-        self.max_page = 1
+        self._max_page = 1
         self._select_targets: list[Path] = []
-        self.render(path or self.root, page=1)
+        self.render(self.root, page=1)
 
     def render(self, path: Path, *, page: int = 1, size_text: str | None = None) -> discord.Embed:
         """Update view controls for ``path`` (file or directory) and return its embed."""
@@ -37,7 +37,7 @@ class FilesView(discord.ui.View):
             self._build_directory_items(page)
         else:
             self.page = 1
-            self.max_page = 1
+            self._max_page = 1
             self._build_file_items()
 
         return build_files_embed(self.path, self.root, self.page, size_text=size_text)
@@ -75,8 +75,8 @@ class FilesView(discord.ui.View):
         except OSError:
             dirs, files = [], []
 
-        self.max_page = get_max_page(len(dirs), len(files))
-        self.page = min(max(page, 1), self.max_page)
+        self._max_page = get_max_page(len(dirs), len(files))
+        self.page = min(max(page, 1), self._max_page)
 
         self.add_item(DirectoryActionsSelect(self.bot))
 
@@ -88,7 +88,7 @@ class FilesView(discord.ui.View):
         self.add_item(_UpdateButton(row=2))
         self.add_item(_PathButton(row=2))
 
-        if self.max_page > 1:
+        if self._max_page > 1:
             self._add_pagination_buttons()
 
     def _build_file_items(self) -> None:
@@ -136,20 +136,20 @@ class FilesView(discord.ui.View):
         return options
 
     def _add_pagination_buttons(self) -> None:
-        if self.max_page > 2:
+        if self._max_page > 2:
             self.add_item(_PageButton('<<', target_page=1, disabled=self.page <= 1))
 
         self.add_item(_PageButton('<', target_page=max(1, self.page - 1), disabled=self.page <= 1))
         self.add_item(
             _PageButton(
                 '>',
-                target_page=min(self.max_page, self.page + 1),
-                disabled=self.page >= self.max_page,
+                target_page=min(self._max_page, self.page + 1),
+                disabled=self.page >= self._max_page,
             )
         )
 
-        if self.max_page > 2:
-            self.add_item(_PageButton('>>', target_page=self.max_page, disabled=self.page >= self.max_page))
+        if self._max_page > 2:
+            self.add_item(_PageButton('>>', target_page=self._max_page, disabled=self.page >= self._max_page))
 
 
 def _clamp_to_root(path: Path, root: Path) -> Path:
@@ -176,7 +176,7 @@ class _FileSelect(discord.ui.Select[FilesView]):
 
 
 class _BackButton(discord.ui.Button[FilesView]):
-    def __init__(self, *, disabled: bool = False, row: int | None = None) -> None:
+    def __init__(self, *, disabled: bool, row: int) -> None:
         super().__init__(label='⬅️', style=discord.ButtonStyle.gray, disabled=disabled, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
@@ -191,7 +191,7 @@ class _BackButton(discord.ui.Button[FilesView]):
 
 
 class _UpdateButton(discord.ui.Button[FilesView]):
-    def __init__(self, *, row: int | None = None) -> None:
+    def __init__(self, *, row: int) -> None:
         super().__init__(label='🔄', style=discord.ButtonStyle.gray, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
@@ -200,7 +200,7 @@ class _UpdateButton(discord.ui.Button[FilesView]):
 
 
 class _PathButton(discord.ui.Button[FilesView]):
-    def __init__(self, *, row: int | None = None) -> None:
+    def __init__(self, *, row: int) -> None:
         super().__init__(label='📌', style=discord.ButtonStyle.gray, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:

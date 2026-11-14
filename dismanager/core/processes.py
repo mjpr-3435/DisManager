@@ -9,7 +9,7 @@ from pathlib import Path
 
 from .paths import DATA_DIR
 
-PROCESSES_FILE = DATA_DIR / 'processes.json'
+_PROCESSES_FILE = DATA_DIR / 'processes.json'
 MAX_PROCESSES = 15
 
 _INVALID_NAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
@@ -27,12 +27,11 @@ class ProcessConfig:
     name: str
     start_command: str
     stop_command: str
-    blacklist: tuple[str, ...] = ()
+    blacklist: tuple[str, ...]
 
-    def resolve_path(self, root: Path | None = None) -> Path:
+    def resolve_path(self) -> Path:
         """Resolve the working directory path automatically from the process name."""
-        base = (root or Path.cwd()).resolve()
-        return base / self.name
+        return Path.cwd().resolve() / self.name
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,14 +39,14 @@ class ProcessDeleteRequest:
     """Payload describing a process deletion and optional folder cleanup."""
 
     name: str
-    delete_files: bool = False
+    delete_files: bool
 
 
 def validate_process_data(
     name: str,
     start_command: str,
     stop_command: str,
-    blacklist: Sequence[str] | str = (),
+    blacklist: Sequence[str] | str,
 ) -> ProcessConfig:
     """Validate and normalize raw fields into a ``ProcessConfig``."""
     clean_name = name.strip()
@@ -65,23 +64,22 @@ def validate_process_data(
     )
 
 
-def load_processes(path: str | Path = PROCESSES_FILE) -> list[ProcessConfig]:
+def load_processes() -> list[ProcessConfig]:
     """Load persisted processes, auto-repairing corrupt, duplicate, or excess entries."""
-    file_path = Path(path)
-    if not file_path.exists():
+    if not _PROCESSES_FILE.exists():
         return []
 
     try:
-        raw_text = file_path.read_text(encoding='utf-8')
+        raw_text = _PROCESSES_FILE.read_text(encoding='utf-8')
         data: object = json.loads(raw_text)
     except (OSError, json.JSONDecodeError) as exc:
-        _logger.warning("Resetting unreadable process store '%s': %s", file_path, exc)
-        _safe_reset_store(file_path)
+        _logger.warning("Resetting unreadable process store '%s': %s", _PROCESSES_FILE, exc)
+        _safe_reset_store()
         return []
 
     if not isinstance(data, list):
-        _logger.warning("Resetting invalid process store '%s': root must be a JSON array.", file_path)
-        _safe_reset_store(file_path)
+        _logger.warning("Resetting invalid process store '%s': root must be a JSON array.", _PROCESSES_FILE)
+        _safe_reset_store()
         return []
 
     processes: list[ProcessConfig] = []
@@ -92,13 +90,13 @@ def load_processes(path: str | Path = PROCESSES_FILE) -> list[ProcessConfig]:
         try:
             config = _parse_process_entry(item, index=idx)
         except ProcessConfigError as exc:
-            _logger.warning("Discarding invalid entry in '%s': %s", file_path, exc)
+            _logger.warning("Discarding invalid entry in '%s': %s", _PROCESSES_FILE, exc)
             needs_repair = True
             continue
 
-        key = config.name.casefold()
+        key = config.name.lower()
         if key in seen_names:
-            _logger.warning("Discarding duplicate process '%s' in '%s'.", config.name, file_path)
+            _logger.warning("Discarding duplicate process '%s' in '%s'.", config.name, _PROCESSES_FILE)
             needs_repair = True
             continue
 
@@ -106,29 +104,28 @@ def load_processes(path: str | Path = PROCESSES_FILE) -> list[ProcessConfig]:
         processes.append(config)
 
     if len(processes) > MAX_PROCESSES:
-        _logger.warning("Purging %d excess process(es) in '%s'.", len(processes) - MAX_PROCESSES, file_path)
+        _logger.warning("Purging %d excess process(es) in '%s'.", len(processes) - MAX_PROCESSES, _PROCESSES_FILE)
         processes = processes[:MAX_PROCESSES]
         needs_repair = True
 
     if needs_repair:
         try:
-            save_processes(processes, file_path)
+            _save_processes(processes)
         except ProcessConfigError as exc:
-            _logger.warning("Could not save repaired process store '%s': %s", file_path, exc)
+            _logger.warning("Could not save repaired process store '%s': %s", _PROCESSES_FILE, exc)
 
     return processes
 
 
-def _safe_reset_store(file_path: Path) -> None:
+def _safe_reset_store() -> None:
     try:
-        save_processes([], file_path)
+        _save_processes([])
     except ProcessConfigError as exc:
-        _logger.warning("Could not reset process store '%s': %s", file_path, exc)
+        _logger.warning("Could not reset process store '%s': %s", _PROCESSES_FILE, exc)
 
 
-def save_processes(processes: Sequence[ProcessConfig], path: str | Path = PROCESSES_FILE) -> None:
+def _save_processes(processes: Sequence[ProcessConfig]) -> None:
     """Persist process definitions atomically to disk."""
-    file_path = Path(path)
     payload = [
         {
             'name': proc.name,
@@ -140,33 +137,19 @@ def save_processes(processes: Sequence[ProcessConfig], path: str | Path = PROCES
     ]
 
     try:
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        tmp_path = file_path.with_suffix(f'{file_path.suffix}.tmp')
+        _PROCESSES_FILE.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = _PROCESSES_FILE.with_suffix(f'{_PROCESSES_FILE.suffix}.tmp')
         tmp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-        tmp_path.replace(file_path)
+        tmp_path.replace(_PROCESSES_FILE)
     except OSError as exc:
-        raise ProcessConfigError(f"Could not save '{file_path}': {exc}") from exc
+        raise ProcessConfigError(f"Could not save '{_PROCESSES_FILE}': {exc}") from exc
 
 
-def get_process(name: str, path: str | Path = PROCESSES_FILE) -> ProcessConfig | None:
-    """Return a persisted process by name (case-insensitive), or ``None``."""
-    target = name.strip().casefold()
-    for proc in load_processes(path):
-        if proc.name.casefold() == target:
-            return proc
-    return None
-
-
-def upsert_process(
-    config: ProcessConfig,
-    *,
-    is_edit: bool = False,
-    path: str | Path = PROCESSES_FILE,
-) -> list[ProcessConfig]:
+def upsert_process(config: ProcessConfig, *, is_edit: bool) -> list[ProcessConfig]:
     """Create or update a process definition and persist the updated list."""
-    processes = load_processes(path)
-    target_key = config.name.casefold()
-    match_idx = next((idx for idx, proc in enumerate(processes) if proc.name.casefold() == target_key), None)
+    processes = load_processes()
+    target_key = config.name.lower()
+    match_idx = next((idx for idx, proc in enumerate(processes) if proc.name.lower() == target_key), None)
 
     if not is_edit:
         if match_idx is not None:
@@ -174,7 +157,7 @@ def upsert_process(
         if len(processes) >= MAX_PROCESSES:
             raise ProcessConfigError(f'Maximum of {MAX_PROCESSES} processes reached.')
         updated = [*processes, config]
-        save_processes(updated, path)
+        _save_processes(updated)
         return updated
 
     if match_idx is None:
@@ -182,19 +165,19 @@ def upsert_process(
 
     updated = list(processes)
     updated[match_idx] = config
-    save_processes(updated, path)
+    _save_processes(updated)
     return updated
 
 
-def delete_process(name: str, path: str | Path = PROCESSES_FILE) -> list[ProcessConfig]:
+def delete_process(name: str) -> list[ProcessConfig]:
     """Delete a persisted process by name and save the updated list."""
-    processes = load_processes(path)
-    target_key = name.strip().casefold()
-    updated = [proc for proc in processes if proc.name.casefold() != target_key]
+    processes = load_processes()
+    target_key = name.strip().lower()
+    updated = [proc for proc in processes if proc.name.lower() != target_key]
     if len(updated) == len(processes):
         raise ProcessConfigError(f"Process '{name}' was not found.")
 
-    save_processes(updated, path)
+    _save_processes(updated)
     return updated
 
 

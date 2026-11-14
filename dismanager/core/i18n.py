@@ -6,7 +6,7 @@ from pathlib import Path
 
 Translator = Callable[[str], str]
 
-LOCALES_DIR = Path(__file__).resolve().parent.parent / 'locales'
+_LOCALES_DIR = Path(__file__).resolve().parent.parent / 'locales'
 
 
 def load_translator(language: str) -> Translator:
@@ -16,7 +16,7 @@ def load_translator(language: str) -> Translator:
         translations = gettext.NullTranslations()
     else:
         try:
-            translations = gettext.translation('app', localedir=str(LOCALES_DIR), languages=[language])
+            translations = gettext.translation('app', localedir=str(_LOCALES_DIR), languages=[language])
         except FileNotFoundError:
             translations = gettext.NullTranslations()
 

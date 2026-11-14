@@ -11,20 +11,20 @@ from typing import Any
 
 from .i18n import Translator
 
-CommandHandler = Callable[[str], Awaitable[bool]]
+_CommandHandler = Callable[[str], Awaitable[bool]]
 
 
 def build_console_handler(
     translator: Translator,
     on_exit: Callable[[], Coroutine[Any, Any, None]],
-) -> CommandHandler:
+) -> _CommandHandler:
     """Create the interactive console command dispatcher."""
     pending_commands = {'start', 'stop', 'restart', 'kill', 'plreload', 'adreload', 'status'}
 
     async def handle(raw_command: str) -> bool:
         cmd = raw_command.split()[0].lower()
         if cmd == 'exit':
-            asyncio.create_task(on_exit())
+            await on_exit()
             return False
 
         if cmd in pending_commands:
@@ -38,10 +38,9 @@ def build_console_handler(
 
 
 async def console_loop(
-    handler: CommandHandler,
+    handler: _CommandHandler,
     *,
-    header: str | None = None,
-    prompt: str = '>> ',
+    header: str,
 ) -> None:
     """Read console commands asynchronously without blocking the event loop."""
     loop = asyncio.get_running_loop()
@@ -65,9 +64,8 @@ async def console_loop(
 
     try:
         while True:
-            if header is not None:
-                print(f'\n{header}')
-            sys.stdout.write(prompt)
+            print(f'\n{header}')
+            sys.stdout.write('>> ')
             sys.stdout.flush()
 
             line = await lines.get()

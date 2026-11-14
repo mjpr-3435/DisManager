@@ -23,7 +23,7 @@ class ProcessesConfigView(discord.ui.View):
     def render(self) -> discord.Embed:
         """Rebuild controls from the client's process list and return the embed."""
         self.clear_items()
-        processes = self.bot.processes
+        processes = self.bot.processes_config
 
         if processes:
             self.add_item(_ProcessSelect(self.bot, processes))
@@ -83,7 +83,7 @@ class _DeleteProcessButton(discord.ui.Button[ProcessesConfigView]):
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        processes = self.view.bot.processes
+        processes = self.view.bot.processes_config
         if not processes:
             await self.view.refresh(interaction)
             return

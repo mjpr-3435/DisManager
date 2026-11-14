@@ -49,9 +49,9 @@ def compute_path_size(path: Path) -> str:
 def build_files_embed(
     path: Path,
     root: Path,
-    page: int = 1,
+    page: int,
     *,
-    size_text: str | None = None,
+    size_text: str | None,
 ) -> discord.Embed:
     """Build the Files navigation embed for a directory or single file."""
     embed = discord.Embed(
@@ -77,7 +77,7 @@ def _populate_directory_embed(
     path: Path,
     page: int,
     *,
-    size_text: str | None = None,
+    size_text: str | None,
 ) -> None:
     try:
         dirs, files = list_directory_entries(path)

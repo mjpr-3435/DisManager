@@ -372,3 +372,9 @@ msgstr  "Eliminar también la carpeta del proceso"
 
 msgid   "This will ALSO permanently delete `DisManager/{}` and all its files. Are you sure?"
 msgstr  "Esto TAMBIÉN eliminará permanentemente `DisManager/{}` y todos sus archivos. ¿Estás seguro?"
+
+msgid   "System Resources"
+msgstr  "Recursos del Sistema"
+
+msgid   "Closing processes..."
+msgstr  "Cerrando procesos..."
