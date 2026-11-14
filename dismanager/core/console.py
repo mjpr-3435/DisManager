@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import os
 import sys
+import threading
+import time
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any
 
@@ -40,20 +44,54 @@ async def console_loop(
     prompt: str = '>> ',
 ) -> None:
     """Read console commands asynchronously without blocking the event loop."""
-    while True:
-        if header is not None:
-            print(f'\n{header}')
-        sys.stdout.write(prompt)
-        sys.stdout.flush()
+    loop = asyncio.get_running_loop()
+    lines: asyncio.Queue[str | None] = asyncio.Queue()
+    stop_event = threading.Event()
 
-        line = await asyncio.to_thread(sys.stdin.readline)
-        if line == '':
-            break
+    def _reader() -> None:
+        try:
+            while not stop_event.is_set():
+                if not _wait_for_stdin(stop_event):
+                    break
+                line = sys.stdin.readline()
+                with contextlib.suppress(RuntimeError):
+                    loop.call_soon_threadsafe(lines.put_nowait, line or None)
+                if not line:
+                    break
+        except (OSError, ValueError):
+            pass
 
-        command = line.strip()
-        if not command:
-            continue
+    threading.Thread(target=_reader, daemon=True, name='console-stdin').start()
 
-        should_continue = await handler(command)
-        if not should_continue:
-            break
+    try:
+        while True:
+            if header is not None:
+                print(f'\n{header}')
+            sys.stdout.write(prompt)
+            sys.stdout.flush()
+
+            line = await lines.get()
+            if line is None:
+                break
+
+            command = line.strip()
+            if not command:
+                continue
+
+            should_continue = await handler(command)
+            if not should_continue:
+                break
+    finally:
+        stop_event.set()
+
+
+def _wait_for_stdin(stop_event: threading.Event) -> bool:
+    if os.name == 'nt' and sys.stdin.isatty():
+        import msvcrt
+
+        while not stop_event.is_set():
+            if msvcrt.kbhit():
+                return True
+            time.sleep(0.05)
+        return False
+    return True
