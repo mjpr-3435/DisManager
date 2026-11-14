@@ -1,0 +1,32 @@
+# =========================================
+#        DisManager Configuration
+# =========================================
+
+### Application designed to manage processes and stream their consoles to Discord.
+### This application is intended to work on Linux systems.
+
+### General Advice:
+### While it may run on Windows, some features may not work as expected.
+
+
+### Description   : The bot token that will be used to initialize DisManager.
+### Advice        : Use a dedicated bot for DisManager.
+Bot Token:
+
+### Description   : The global bot prefix.
+### Default Value : "!!"
+Bot Prefix: "!!"
+
+### Description   : The ID of the channel where the DisManager panel will be created.
+### Advice        : Use a clean channel for the DisManager panel.
+Panel ID:
+
+### Description   : Language that DisManager will use.
+### Valid Values  : [en, es]
+### Default Value : en
+Language: en
+
+### Description   : Number of backups that DisManager will save.
+### Valid Values  : [1, 5] (inclusive)
+### Default Value : 3
+Backups: 3

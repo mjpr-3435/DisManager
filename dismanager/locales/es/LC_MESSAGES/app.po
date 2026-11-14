@@ -1,0 +1,25 @@
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Language: es\n"
+
+### ———————————————————————————————————————
+### main
+
+msgid   "Your configuration has been loaded successfully."
+msgstr  "La configuración se ha cargado exitosamente."
+
+msgid   "Error while running discord client: {}"
+msgstr  "Error al inicializar el cliente de discord: {}"
+
+### ———————————————————————————————————————
+### client
+
+msgid   "Error: Channel with id {} not found."
+msgstr  "Error: No se encontró el canal con id {}."
+
+msgid   "Error: The panel channel must be a text channel."
+msgstr  "Error: El canal del panel debe ser un canal de texto."
+
+msgid   "Logged in as {}!"
+msgstr  "Sesión iniciada como {}!"
