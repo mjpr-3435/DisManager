@@ -6,6 +6,7 @@ import discord
 
 from ..files import FilesView
 from ..guide import build_guide_embed
+from ..processes import ProcessesConfigView
 from ..utils import confirmation_request
 
 if TYPE_CHECKING:
@@ -18,6 +19,7 @@ class PanelView(discord.ui.View):
     def __init__(self, bot: DisManagerClient) -> None:
         super().__init__(timeout=None)
         self.bot = bot
+        self.add_item(_ConfigButton(bot))
         self.add_item(_FilesButton(bot))
         self.add_item(_GuideButton())
         self.add_item(_RestartButton(bot))
@@ -37,6 +39,18 @@ class _FilesButton(discord.ui.Button[PanelView]):
         await interaction.response.defer(ephemeral=True, thinking=True)
         view = FilesView(self.bot)
         embed = view.render(view.path)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+
+class _ConfigButton(discord.ui.Button[PanelView]):
+    def __init__(self, bot: DisManagerClient) -> None:
+        super().__init__(label='Config', style=discord.ButtonStyle.gray)
+        self.bot = bot
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        view = ProcessesConfigView(self.bot)
+        embed = view.render()
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 

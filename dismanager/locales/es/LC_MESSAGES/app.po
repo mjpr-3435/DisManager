@@ -300,3 +300,69 @@ msgstr  "✖ No se pudo guardar el archivo: {}"
 
 msgid   "✔ Saved `{}`."
 msgstr  "✔ Guardado `{}`."
+
+msgid   "Processes"
+msgstr  "Procesos"
+
+msgid   "*(no processes configured yet)*"
+msgstr  "*(no hay procesos configurados todavía)*"
+
+msgid   "Start"
+msgstr  "Inicio"
+
+msgid   "Stop"
+msgstr  "Apagado"
+
+msgid   "Blacklist"
+msgstr  "Lista negra"
+
+msgid   "New process"
+msgstr  "Nuevo proceso"
+
+msgid   "Edit"
+msgstr  "Editar"
+
+msgid   "Name"
+msgstr  "Nombre"
+
+msgid   "Start command"
+msgstr  "Comando de inicio"
+
+msgid   "Stop command"
+msgstr  "Comando de apagado"
+
+msgid   "One entry per line"
+msgstr  "Una entrada por línea"
+
+msgid   "Create or edit a process"
+msgstr  "Crear o editar un proceso"
+
+msgid   "Delete a process"
+msgstr  "Eliminar un proceso"
+
+msgid   "Are you sure you want to delete process '{}'?"
+msgstr  "¿Seguro que quieres eliminar el proceso '{}'?"
+
+msgid   "Select an option below to create, edit, or delete processes."
+msgstr  "Selecciona una opción abajo para crear, editar o eliminar procesos."
+
+msgid   "Process"
+msgstr  "Proceso"
+
+msgid   "Select an action or process"
+msgstr  "Selecciona una acción o un proceso"
+
+msgid   "New"
+msgstr  "Nuevo"
+
+msgid   "Delete"
+msgstr  "Eliminar"
+
+msgid   "Select a process"
+msgstr  "Selecciona un proceso"
+
+msgid   "Processes Configuration"
+msgstr  "Configuración de Procesos"
+
+msgid   "Configure the processes managed by DisManager. Each process automatically uses a folder matching its name inside `DisManager/`.\n\n• Select a process from the menu to inspect or edit its settings.\n• Use **New** to register a process (up to 15) or **Delete** to remove one."
+msgstr  "Configura los procesos administrados por DisManager. Cada proceso usa automáticamente una carpeta con su mismo nombre dentro de `DisManager/`.\n\n• Selecciona un proceso en el menú para inspeccionar o editar su configuración.\n• Usa **Nuevo** para registrar un proceso (hasta 15) o **Eliminar** para quitar uno."
