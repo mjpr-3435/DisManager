@@ -14,7 +14,7 @@ from discord.ext import commands
 
 from ..addons import AddonManager
 from ..core.config import DisManagerConfig
-from ..core.console import build_console_handler, console_loop
+from ..core.console import ProcessAction, build_console_handler, console_loop
 from ..core.i18n import Translator
 from ..core.logs import mute_console_logging
 from ..core.processes import (
@@ -59,6 +59,10 @@ class DisManagerClient(commands.Bot):
         self._last_error_notice: dict[str, float] = {}
         self.addons = AddonManager(self)
 
+    @property
+    def max_backups(self) -> int:
+        return self._config.backups
+
     # --- Discord Hooks ---
 
     async def setup_hook(self) -> None:
@@ -86,7 +90,14 @@ class DisManagerClient(commands.Bot):
             f"{self._('Commands')}: "
             'start, stop, restart, kill, plreload, adreload, status, exit'
         )
-        handler = build_console_handler(self._, self.close, self.reload_addons)
+        handler = build_console_handler(
+            self._,
+            self.close,
+            self.reload_addons,
+            self.reload_plugins,
+            self._console_process_action,
+            self._console_status,
+        )
         self._panel_task = asyncio.create_task(self._panel_loop())
         self._console_task = asyncio.create_task(console_loop(handler, header=header))
 
@@ -129,6 +140,9 @@ class DisManagerClient(commands.Bot):
             asyncio.create_task(process.restart())
         elif cmd == 'logs':
             await process.send_logs()
+        elif cmd == 'plreload':
+            count = await process.reload_plugins()
+            await message.channel.send(self._('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
         else:
             process.execute(message.content)
 
@@ -264,6 +278,63 @@ class DisManagerClient(commands.Bot):
     async def reload_addons(self) -> int:
         """Unload, purge cached addon modules, and reload all addons."""
         return await self.addons.load_addons(reload=True)
+
+    async def reload_plugins(self, process_name: str | None = None) -> int:
+        """Reload per-process plugins for ``process_name`` or all active processes."""
+        if process_name is not None:
+            process = self.find_process(process_name)
+            if process is None:
+                return 0
+            return await process.reload_plugins()
+
+        total = 0
+        for process in list(self._processes.values()):
+            total += await process.reload_plugins()
+        return total
+
+    async def _console_process_action(self, action: ProcessAction, name: str) -> str:
+        target = name.strip()
+        if not target:
+            return self._('Specify the process. E.g.: {} <name>').format(action)
+
+        process = self.find_process(target)
+        if process is None:
+            return self._("Process '{}' not found.").format(target)
+
+        if action == 'start':
+            if process.is_running():
+                return self._('[{}]: The process is already running.').format(process.name)
+            try:
+                process.start()
+            except ProcessConfigError as exc:
+                return f'[{process.name}]: {exc}'
+            return self._('[{}]: Initializing process.').format(process.name)
+
+        if not process.is_running():
+            return self._('[{}]: The process is not running.').format(process.name)
+
+        if action == 'stop':
+            process.stop()
+            return self._('[{}]: Stopping process.').format(process.name)
+        if action == 'kill':
+            process.kill()
+            return self._('[{}]: Killing process.').format(process.name)
+
+        asyncio.create_task(process.restart())
+        return self._('[{}]: Restarting process.').format(process.name)
+
+    def _console_status(self) -> str:
+        if not self._processes:
+            return self._('No processes configured.')
+
+        lines: list[str] = []
+        for proc in self._processes.values():
+            if proc.is_running():
+                ram_mb = proc.ram_usage_bytes() / (1024 * 1024)
+                lines.append(f'  • {proc.name}: {self._("Online")} ({ram_mb:.1f} MB)')
+            else:
+                lines.append(f'  • {proc.name}: {self._("Offline")}')
+        return '\n'.join(lines)
 
     def emit_addon_event(self, event_name: str, *args: object) -> None:
         """Schedule an addon event dispatch on the active event loop."""

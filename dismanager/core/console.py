@@ -7,23 +7,29 @@ import sys
 import threading
 import time
 from collections.abc import Awaitable, Callable, Coroutine
-from typing import Any
+from typing import Any, Literal
 
 from .i18n import Translator
 
 _CommandHandler = Callable[[str], Awaitable[bool]]
+ProcessAction = Literal['start', 'stop', 'restart', 'kill']
 
 
 def build_console_handler(
     translator: Translator,
     on_exit: Callable[[], Coroutine[Any, Any, None]],
     on_adreload: Callable[[], Coroutine[Any, Any, int]],
+    on_plreload: Callable[[str | None], Coroutine[Any, Any, int]],
+    on_process_action: Callable[[ProcessAction, str], Coroutine[Any, Any, str]],
+    on_status: Callable[[], str],
 ) -> _CommandHandler:
     """Create the interactive console command dispatcher."""
-    pending_commands = {'start', 'stop', 'restart', 'kill', 'plreload', 'status'}
 
     async def handle(raw_command: str) -> bool:
-        cmd = raw_command.split()[0].lower()
+        parts = raw_command.split(maxsplit=1)
+        cmd = parts[0].lower()
+        arg = parts[1].strip() if len(parts) > 1 else ''
+
         if cmd == 'exit':
             await on_exit()
             return False
@@ -33,8 +39,26 @@ def build_console_handler(
             print(translator('Reloaded {} addon(s).').format(count))
             return True
 
-        if cmd in pending_commands:
-            print(translator("Command '{}' is not implemented yet.").format(cmd))
+        if cmd == 'plreload':
+            count = await on_plreload(arg or None)
+            print(translator('Reloaded {} plugin(s).').format(count))
+            return True
+
+        if cmd in ('start', 'stop', 'restart', 'kill'):
+            action: ProcessAction = (
+                'start'
+                if cmd == 'start'
+                else 'stop'
+                if cmd == 'stop'
+                else 'restart'
+                if cmd == 'restart'
+                else 'kill'
+            )
+            print(await on_process_action(action, arg))
+            return True
+
+        if cmd == 'status':
+            print(on_status())
             return True
 
         print(translator("Unknown command: '{}'.").format(cmd))

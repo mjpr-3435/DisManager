@@ -8,13 +8,16 @@ import shlex
 import signal
 import subprocess
 import threading
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import psutil
 
+from ..core.backups import make_backup, process_backups_dir, restore_backup
 from ..core.logs import ByteRingBuffer, SessionLogWriter
 from ..core.paths import LOGS_DIR
 from ..core.processes import ProcessConfig, ProcessConfigError
+from .plugins import PluginManager
 from .relay import ConsoleRelay
 
 if TYPE_CHECKING:
@@ -34,10 +37,23 @@ class ManagedProcess:
         self._log_buffer = ByteRingBuffer()
         self._stop_requested = False
         self._reader_thread: threading.Thread | None = None
+        self._plugins = PluginManager(self, client)
+        process_backups_dir(config.name).mkdir(parents=True, exist_ok=True)
+        self._plugins.plugins_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def name(self) -> str:
         return self._config.name
+
+    @property
+    def client(self) -> DisManagerClient:
+        """Return the Discord client managing this process."""
+        return self._client
+
+    @property
+    def path(self) -> Path:
+        """Return the resolved working directory for this process."""
+        return self._config.resolve_path()
 
     def update_config(self, config: ProcessConfig) -> None:
         """Update process configuration in-place."""
@@ -46,6 +62,23 @@ class ManagedProcess:
     def is_running(self) -> bool:
         """Return ``True`` while the subprocess is alive or its Discord relay is still draining."""
         return self._is_process_alive() or self._relay.is_active
+
+    def make_backup(self, progress: list[int] | None = None) -> Path:
+        """Create a rotating backup of this process's directory."""
+        if self.is_running():
+            raise RuntimeError(f"Process '{self.name}' is currently running.")
+        return make_backup(
+            self.name,
+            self._config.resolve_path(),
+            self._client.max_backups,
+            progress,
+        )
+
+    def restore_backup(self, backup_dir: Path, progress: list[int] | None = None) -> None:
+        """Restore ``backup_dir`` into this process's directory."""
+        if self.is_running():
+            raise RuntimeError(f"Process '{self.name}' is currently running.")
+        restore_backup(backup_dir, self._config.resolve_path(), progress)
 
     def start(self) -> bool:
         """Start the configured subprocess and begin reading its output."""
@@ -106,8 +139,24 @@ class ManagedProcess:
             daemon=True,
         )
         self._reader_thread.start()
+        if loop is not None:
+            loop.create_task(self._on_start_plugins())
         self._client.emit_addon_event('on_process_start', self)
         return True
+
+    async def reload_plugins(self) -> int:
+        """Reload per-process plugins when this process is running."""
+        if not self.is_running():
+            return 0
+        return await self._plugins.load_plugins(reload=True)
+
+    def emit_plugin_event(self, event_name: str, *args: object) -> None:
+        """Schedule a plugin event dispatch on the active event loop."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._plugins.call_plugins(event_name, *args))
 
     def stop(self) -> bool:
         """Request a graceful stop via ``stop_command`` or OS signal."""
@@ -118,6 +167,7 @@ class ManagedProcess:
         should_emit_stop = not self._stop_requested
         self._stop_requested = True
         if should_emit_stop:
+            self.emit_plugin_event('on_process_stop')
             self._client.emit_addon_event('on_process_stop', self)
         if self._config.stop_command:
             return self.execute(self._config.stop_command)
@@ -138,6 +188,7 @@ class ManagedProcess:
         should_emit_stop = proc.poll() is None and not self._stop_requested
         self._stop_requested = True
         if should_emit_stop:
+            self.emit_plugin_event('on_process_stop')
             self._client.emit_addon_event('on_process_stop', self)
         with contextlib.suppress(psutil.Error, OSError):
             parent = psutil.Process(proc.pid)
@@ -180,6 +231,7 @@ class ManagedProcess:
             if self._is_process_alive():
                 self.kill()
         await self._relay.shutdown()
+        await self._plugins.unload_plugins()
 
     def execute(self, command: str) -> bool:
         """Write a command line to the subprocess stdin."""
@@ -238,6 +290,7 @@ class ManagedProcess:
                         session_log.write_line(cleaned)
                         if loop is not None and not loop.is_closed():
                             loop.call_soon_threadsafe(self._relay.enqueue, cleaned)
+                            loop.call_soon_threadsafe(self.emit_plugin_event, 'on_process_log', cleaned)
                 finally:
                     with contextlib.suppress(OSError):
                         stdout.close()
@@ -263,3 +316,17 @@ class ManagedProcess:
         self._relay.finish(reason=reason)
         if crashed:
             self._client.emit_addon_event('on_process_crash', self)
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._on_finish_plugins(crashed=crashed))
+
+    async def _on_start_plugins(self) -> None:
+        await self._plugins.load_plugins(reload=False)
+        await self._plugins.call_plugins('on_process_start')
+
+    async def _on_finish_plugins(self, *, crashed: bool) -> None:
+        if crashed:
+            await self._plugins.call_plugins('on_process_crash')
+        await self._plugins.unload_plugins()

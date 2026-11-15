@@ -51,11 +51,17 @@ class _BotCommands(commands.Cog):
         await self._run_process_command(ctx, 'restart', name)
 
     @commands.command(name='plreload')
-    async def plreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:
+    async def plreload_command(self, ctx: commands.Context[DisManagerClient], *, name: str = '') -> None:
         if self.bot.panel is None or ctx.channel.id != self.bot.panel.id:
             return
         with contextlib.suppress(discord.HTTPException):
             await ctx.message.delete()
+        target = name.strip() or None
+        if target is not None and self.bot.find_process(target) is None:
+            await ctx.send(self.bot._('✖ Process `{}` not found.').format(target), delete_after=3)
+            return
+        count = await self.bot.reload_plugins(target)
+        await ctx.send(self.bot._('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
 
     @commands.command(name='adreload')
     async def adreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:
