@@ -122,12 +122,13 @@ class ConsoleRelay:
                     if item is None:
                         saw_sentinel = True
                     else:
+                        self._flush_omission_notice(pending_chunks)
                         self._append_sanitized_log(pending_chunks, item)
                         if not self._finished:
                             await asyncio.sleep(0.25)
 
                 saw_sentinel = self._drain_ready_items(queue, pending_chunks, saw_sentinel=saw_sentinel)
-                self._queue_omission_notice(queue, pending_chunks, process_finished=saw_sentinel)
+                self._flush_omission_notice(pending_chunks)
 
                 batch = self._take_relay_batch(pending_chunks)
                 if batch:
@@ -165,22 +166,13 @@ class ConsoleRelay:
             if item is None:
                 saw_sentinel = True
                 break
+            self._flush_omission_notice(pending_chunks)
             self._append_sanitized_log(pending_chunks, item)
         return saw_sentinel
 
-    def _queue_omission_notice(
-        self,
-        queue: asyncio.Queue[str | None],
-        pending_chunks: deque[str],
-        *,
-        process_finished: bool,
-    ) -> None:
+    def _flush_omission_notice(self, pending_chunks: deque[str]) -> None:
         if self._omitted_logs == 0:
             return
-        recovered = queue.qsize() <= _RELAY_QUEUE_MAXSIZE // 2
-        if not recovered and not process_finished:
-            return
-
         omitted = self._omitted_logs
         self._omitted_logs = 0
         stamp = datetime.now().strftime('%H:%M:%S')

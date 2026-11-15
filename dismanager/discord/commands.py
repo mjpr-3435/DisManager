@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import io
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 import discord
 from discord.ext import commands
 
 from ..core.logs import get_recent_log_bytes, get_session_log_filename
+from ..core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
     from .client import DisManagerClient
@@ -30,6 +33,87 @@ class _BotCommands(commands.Cog):
 
         file = discord.File(io.BytesIO(data), filename=get_session_log_filename())
         await ctx.send(file=file)
+
+    @commands.command(name='start')
+    async def start_command(self, ctx: commands.Context[DisManagerClient], *, name: str = '') -> None:
+        await self._run_process_command(ctx, 'start', name)
+
+    @commands.command(name='stop')
+    async def stop_command(self, ctx: commands.Context[DisManagerClient], *, name: str = '') -> None:
+        await self._run_process_command(ctx, 'stop', name)
+
+    @commands.command(name='kill')
+    async def kill_command(self, ctx: commands.Context[DisManagerClient], *, name: str = '') -> None:
+        await self._run_process_command(ctx, 'kill', name)
+
+    @commands.command(name='restart')
+    async def restart_command(self, ctx: commands.Context[DisManagerClient], *, name: str = '') -> None:
+        await self._run_process_command(ctx, 'restart', name)
+
+    @commands.command(name='plreload')
+    async def plreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:
+        if self.bot.panel is None or ctx.channel.id != self.bot.panel.id:
+            return
+        with contextlib.suppress(discord.HTTPException):
+            await ctx.message.delete()
+
+    @commands.command(name='adreload')
+    async def adreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:
+        if self.bot.panel is None or ctx.channel.id != self.bot.panel.id:
+            return
+        with contextlib.suppress(discord.HTTPException):
+            await ctx.message.delete()
+
+    async def _run_process_command(
+        self,
+        ctx: commands.Context[DisManagerClient],
+        action: Literal['start', 'stop', 'kill', 'restart'],
+        name: str,
+    ) -> None:
+        if self.bot.panel is None or ctx.channel.id != self.bot.panel.id:
+            return
+
+        with contextlib.suppress(discord.HTTPException):
+            await ctx.message.delete()
+
+        target = name.strip()
+        if not target:
+            await ctx.send(
+                f'✖ Specify the process. E.g.: `{ctx.prefix}{action} <name>`',
+                delete_after=5,
+            )
+            return
+
+        process = self.bot.find_process(target)
+        if process is None:
+            await ctx.send(f'✖ Process `{target}` not found.', delete_after=5)
+            return
+
+        if action == 'start':
+            if process.is_running():
+                await ctx.send(f'✖ `[{process.name}]`: The process was already open.', delete_after=2)
+                return
+            try:
+                process.start()
+            except ProcessConfigError as exc:
+                await ctx.send(f'✖ `[{process.name}]`: {exc}', delete_after=5)
+                return
+            await ctx.send(f'✔ `[{process.name}]`: Initializing process.', delete_after=2)
+            return
+
+        if not process.is_running():
+            await ctx.send(f'✖ `[{process.name}]`: The process was not open.', delete_after=2)
+            return
+
+        if action == 'stop':
+            process.stop()
+            await ctx.send(f'✔ `[{process.name}]`: Stopping process.', delete_after=2)
+        elif action == 'kill':
+            process.kill()
+            await ctx.send(f'✔ `[{process.name}]`: Killing process.', delete_after=2)
+        else:
+            asyncio.create_task(process.restart())
+            await ctx.send(f'✔ `[{process.name}]`: Restarting process.', delete_after=2)
 
 
 async def setup(bot: DisManagerClient) -> None:

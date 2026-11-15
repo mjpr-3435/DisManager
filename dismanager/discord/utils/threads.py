@@ -19,4 +19,8 @@ async def get_or_create_thread(
             await archived.edit(archived=False)
             return archived
 
-    return await channel.create_thread(name=target_name, type=discord.ChannelType.public_thread)
+    message = await channel.send('_')
+    try:
+        return await channel.create_thread(name=target_name, message=message)
+    finally:
+        await message.delete()

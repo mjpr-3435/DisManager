@@ -73,6 +73,8 @@ class DisManagerClient(commands.Bot):
 
         self.panel = panel
         self.error_thread = await get_or_create_thread(panel, _ERROR_THREAD_NAME)
+        for proc in self.processes_config:
+            await get_or_create_thread(panel, f'Console {proc.name}')
         self._ready_once = True
         print(self._('Logged in as {}!').format(self.user))
         mute_console_logging()
@@ -84,6 +86,14 @@ class DisManagerClient(commands.Bot):
         handler = build_console_handler(self._, self.close)
         self._panel_task = asyncio.create_task(self._panel_loop())
         self._console_task = asyncio.create_task(console_loop(handler, header=header))
+
+    async def on_thread_update(self, _before: discord.Thread, after: discord.Thread) -> None:
+        if self.panel is None or after.parent_id != self.panel.id or not after.archived:
+            return
+        if after.name == _ERROR_THREAD_NAME or after.name.removeprefix('Console ') in self._processes:
+            with contextlib.suppress(discord.HTTPException):
+                await after.edit(archived=False)
+            self._panel_refresh_event.set()
 
     async def on_message(self, message: discord.Message) -> None:
         await self.process_commands(message)
@@ -241,9 +251,20 @@ class DisManagerClient(commands.Bot):
             with contextlib.suppress(Exception):
                 await self.error_thread.send(f'⚠ **[{context}]** {notice}')
 
+    async def _ensure_console_thread(self, name: str) -> None:
+        if self.panel is not None:
+            with contextlib.suppress(Exception):
+                await get_or_create_thread(self.panel, f'Console {name}')
+        self._panel_refresh_event.set()
+
     def get_process_config(self, name: str) -> ProcessConfig | None:
         """Return a configured process from the client's in-memory state."""
         return next((proc for proc in self.processes_config if proc.name == name), None)
+
+    def find_process(self, name: str) -> ManagedProcess | None:
+        """Return a managed process matching ``name`` case-insensitively."""
+        target = name.strip().lower()
+        return next((proc for key, proc in self._processes.items() if key.lower() == target), None)
 
     def on_processes_edit(
         self,
@@ -259,7 +280,10 @@ class DisManagerClient(commands.Bot):
                 payload.resolve_path().mkdir(parents=True, exist_ok=True)
             except OSError as exc:
                 raise ProcessConfigError(f"Could not create process folder '{payload.name}': {exc}") from exc
-            self._panel_refresh_event.set()
+            if self.panel is not None:
+                asyncio.create_task(self._ensure_console_thread(payload.name))
+            else:
+                self._panel_refresh_event.set()
             return
 
         if event == 'update':
@@ -276,17 +300,28 @@ class DisManagerClient(commands.Bot):
             target_proc = self.get_process_config(payload.name)
             self.processes_config = delete_process(payload.name)
             process = self._processes.pop(payload.name, None)
-            if process is not None:
-                asyncio.create_task(process.shutdown())
+            target_dir: Path | None = None
             if payload.delete_files and target_proc is not None:
                 root = Path.cwd().resolve()
-                target_dir = target_proc.resolve_path().resolve()
-                if target_dir != root and target_dir.is_relative_to(root) and target_dir.exists():
-                    try:
-                        shutil.rmtree(target_dir)
-                    except OSError as exc:
-                        raise ProcessConfigError(f"Could not delete process folder '{payload.name}': {exc}") from exc
+                candidate_dir = target_proc.resolve_path().resolve()
+                if candidate_dir != root and candidate_dir.is_relative_to(root):
+                    target_dir = candidate_dir
+            if process is not None or target_dir is not None:
+                asyncio.create_task(self._cleanup_deleted_process(process, target_dir))
             self._panel_refresh_event.set()
             return
 
         raise ValueError(f'Unsupported process edit event: {event}')
+
+    async def _cleanup_deleted_process(
+        self,
+        process: ManagedProcess | None,
+        target_dir: Path | None,
+    ) -> None:
+        if process is not None:
+            await process.shutdown()
+        if target_dir is not None and target_dir.exists():
+            try:
+                await asyncio.to_thread(shutil.rmtree, target_dir)
+            except OSError:
+                await self.report_error(f'DeleteProcess:{target_dir.name}')
