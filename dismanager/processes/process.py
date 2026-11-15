@@ -28,6 +28,7 @@ class ManagedProcess:
 
     def __init__(self, config: ProcessConfig, client: DisManagerClient) -> None:
         self._config = config
+        self._client = client
         self._relay = ConsoleRelay(config.name, client)
         self._process: subprocess.Popen[bytes] | None = None
         self._log_buffer = ByteRingBuffer()
@@ -105,6 +106,7 @@ class ManagedProcess:
             daemon=True,
         )
         self._reader_thread.start()
+        self._client.emit_addon_event('on_process_start', self)
         return True
 
     def stop(self) -> bool:
@@ -113,7 +115,10 @@ class ManagedProcess:
         if proc is None or proc.poll() is not None:
             return False
 
+        should_emit_stop = not self._stop_requested
         self._stop_requested = True
+        if should_emit_stop:
+            self._client.emit_addon_event('on_process_stop', self)
         if self._config.stop_command:
             return self.execute(self._config.stop_command)
 
@@ -130,7 +135,10 @@ class ManagedProcess:
         if proc is None:
             return False
 
+        should_emit_stop = proc.poll() is None and not self._stop_requested
         self._stop_requested = True
+        if should_emit_stop:
+            self._client.emit_addon_event('on_process_stop', self)
         with contextlib.suppress(psutil.Error, OSError):
             parent = psutil.Process(proc.pid)
             children = parent.children(recursive=True)
@@ -243,12 +251,15 @@ class ManagedProcess:
             self._stop_requested = False
 
         if loop is not None and not loop.is_closed():
+            crashed = not stop_requested and returncode != 0
             reason = (
-                None
-                if stop_requested or returncode == 0
-                else f'Process exited unexpectedly (code {returncode}).'
+                f'Process exited unexpectedly (code {returncode}).'
+                if crashed
+                else None
             )
-            loop.call_soon_threadsafe(self._finish_relay, reason)
+            loop.call_soon_threadsafe(self._finish_relay, reason, crashed)
 
-    def _finish_relay(self, reason: str | None) -> None:
+    def _finish_relay(self, reason: str | None, crashed: bool) -> None:
         self._relay.finish(reason=reason)
+        if crashed:
+            self._client.emit_addon_event('on_process_crash', self)

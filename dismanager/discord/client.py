@@ -12,6 +12,7 @@ import aiohttp
 import discord
 from discord.ext import commands
 
+from ..addons import AddonManager
 from ..core.config import DisManagerConfig
 from ..core.console import build_console_handler, console_loop
 from ..core.i18n import Translator
@@ -56,6 +57,7 @@ class DisManagerClient(commands.Bot):
         self._panel_refresh_event = asyncio.Event()
         self._console_task: asyncio.Task[None] | None = None
         self._last_error_notice: dict[str, float] = {}
+        self.addons = AddonManager(self)
 
     # --- Discord Hooks ---
 
@@ -77,13 +79,14 @@ class DisManagerClient(commands.Bot):
             await get_or_create_thread(panel, f'Console {proc.name}')
         self._ready_once = True
         print(self._('Logged in as {}!').format(self.user))
+        await self.addons.load_addons(reload=False)
         mute_console_logging()
 
         header = (
             f"{self._('Commands')}: "
             'start, stop, restart, kill, plreload, adreload, status, exit'
         )
-        handler = build_console_handler(self._, self.close)
+        handler = build_console_handler(self._, self.close, self.reload_addons)
         self._panel_task = asyncio.create_task(self._panel_loop())
         self._console_task = asyncio.create_task(console_loop(handler, header=header))
 
@@ -202,6 +205,7 @@ class DisManagerClient(commands.Bot):
                     timeout=65.0,
                 )
 
+        await self.addons.unload_addons()
         await self._mark_panel_offline()
         await super().close()
 
@@ -256,6 +260,18 @@ class DisManagerClient(commands.Bot):
             with contextlib.suppress(Exception):
                 await get_or_create_thread(self.panel, f'Console {name}')
         self._panel_refresh_event.set()
+
+    async def reload_addons(self) -> int:
+        """Unload, purge cached addon modules, and reload all addons."""
+        return await self.addons.load_addons(reload=True)
+
+    def emit_addon_event(self, event_name: str, *args: object) -> None:
+        """Schedule an addon event dispatch on the active event loop."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self.addons.call_addons(event_name, *args))
 
     def get_process_config(self, name: str) -> ProcessConfig | None:
         """Return a configured process from the client's in-memory state."""

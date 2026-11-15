@@ -17,15 +17,21 @@ _CommandHandler = Callable[[str], Awaitable[bool]]
 def build_console_handler(
     translator: Translator,
     on_exit: Callable[[], Coroutine[Any, Any, None]],
+    on_adreload: Callable[[], Coroutine[Any, Any, int]],
 ) -> _CommandHandler:
     """Create the interactive console command dispatcher."""
-    pending_commands = {'start', 'stop', 'restart', 'kill', 'plreload', 'adreload', 'status'}
+    pending_commands = {'start', 'stop', 'restart', 'kill', 'plreload', 'status'}
 
     async def handle(raw_command: str) -> bool:
         cmd = raw_command.split()[0].lower()
         if cmd == 'exit':
             await on_exit()
             return False
+
+        if cmd == 'adreload':
+            count = await on_adreload()
+            print(translator('Reloaded {} addon(s).').format(count))
+            return True
 
         if cmd in pending_commands:
             print(translator("Command '{}' is not implemented yet.").format(cmd))

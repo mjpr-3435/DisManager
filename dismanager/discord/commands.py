@@ -63,6 +63,8 @@ class _BotCommands(commands.Cog):
             return
         with contextlib.suppress(discord.HTTPException):
             await ctx.message.delete()
+        count = await self.bot.reload_addons()
+        await ctx.send(f'✔ Reloaded {count} addon(s).', delete_after=2)
 
     async def _run_process_command(
         self,
