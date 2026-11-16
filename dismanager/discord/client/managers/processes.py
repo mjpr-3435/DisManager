@@ -24,10 +24,15 @@ if TYPE_CHECKING:
 class ProcessManager:
     """Manages configured processes, CRUD updates, plugin reloads, and shutdown."""
 
+    configs     : list[ProcessConfig]
+    _processes  : dict[str, ManagedProcess]
+
     def __init__(self, client: DisManagerClient) -> None:
-        self._client = client
-        self.configs: list[ProcessConfig] = []
-        self._processes: dict[str, ManagedProcess] = {}
+        self._client    = client
+        self._processes = {}
+        self.configs    = []
+
+    # --- Internal API ---
 
     def load(self) -> None:
         """Load process configurations and instantiate managed processes."""
@@ -117,6 +122,8 @@ class ProcessManager:
                 asyncio.gather(*(proc.shutdown() for proc in self._processes.values()), return_exceptions=True),
                 timeout=65.0,
             )
+
+    # --- Internal Behaviour ---
 
     async def _cleanup_deleted_process(
         self,

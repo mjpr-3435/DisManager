@@ -153,7 +153,6 @@ class ConsoleManager:
     
     # --- Internal API ---
 
-
     def start(self) -> None:
         """Start the interactive console task."""
         self._task = asyncio.create_task(self._loop())

@@ -25,7 +25,7 @@ class AddonManager:
         self._client = client
         self._addons: dict[str, object] = {}
         
-    # --- Public API ---
+    # --- Internal API ---
 
     async def load_addons(self, *, reload: bool) -> int:
         """Discover and load addons from ``.addons/``, purging stale modules on reload."""
