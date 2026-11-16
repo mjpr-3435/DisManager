@@ -26,82 +26,7 @@ class ProcessStore:
         self._store_file = store_file
         self._configs = []
 
-    @property
-    def configs(self) -> tuple[ProcessConfig, ...]:
-        """Return a read-only snapshot of loaded process configurations."""
-        return tuple(self._configs)
-
-    def get(self, name: str) -> ProcessConfig | None:
-        """Return a configured process matching ``name`` case-insensitively."""
-        target = name.strip().casefold()
-        return next((proc for proc in self._configs if proc.name.casefold() == target), None)
-
-    def load(self) -> tuple[ProcessConfig, ...]:
-        """Load persisted processes, auto-repairing corrupt, duplicate, or excess entries."""
-        self._configs = self._read_from_disk()
-        return tuple(self._configs)
-
-    def create(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
-        """Validate, persist, and create the working folder for a new process."""
-        config = self._build_config(target, payload)
-        processes = self._read_from_disk()
-        key = config.name.casefold()
-
-        if any(proc.name.casefold() == key for proc in processes):
-            raise ProcessConfigError(f"A process named '{config.name}' already exists.")
-        if len(processes) >= MAX_PROCESSES:
-            raise ProcessConfigError(f'Maximum of {MAX_PROCESSES} processes reached.')
-
-        updated = [*processes, config]
-        self._save_to_disk(updated)
-        try:
-            config.resolve_path().mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            raise ProcessConfigError(f"Could not create process folder '{config.name}': {exc}") from exc
-
-        self._configs = updated
-        return config
-
-    def update(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
-        """Validate and persist updates to an existing process configuration."""
-        config = self._build_config(target, payload)
-        processes = self._read_from_disk()
-        key = config.name.casefold()
-        match_idx = next((idx for idx, proc in enumerate(processes) if proc.name.casefold() == key), None)
-        if match_idx is None:
-            raise ProcessConfigError(f"Process '{config.name}' was not found.")
-
-        updated = list(processes)
-        updated[match_idx] = config
-        self._save_to_disk(updated)
-        self._configs = updated
-        return config
-
-    def delete(self, target: str) -> ProcessConfig:
-        """Remove a persisted process by name and return the removed configuration."""
-        processes = self._read_from_disk()
-        target_key = target.strip().casefold()
-        removed = next((proc for proc in processes if proc.name.casefold() == target_key), None)
-        if removed is None:
-            raise ProcessConfigError(f"Process '{target}' was not found.")
-
-        updated = [proc for proc in processes if proc.name.casefold() != target_key]
-        self._save_to_disk(updated)
-        self._configs = updated
-        return removed
-
-    async def delete_folder(self, name: str) -> None:
-        """Safely delete the process working directory if it resides under the workspace root."""
-        root = Path.cwd().resolve()
-        candidate_dir = (root / name).resolve()
-        if candidate_dir == root or not candidate_dir.is_relative_to(root):
-            return
-        if candidate_dir.exists():
-            await asyncio.to_thread(shutil.rmtree, candidate_dir)
-
-    # =========================================
-    #            Internal Helpers
-    # =========================================
+    # --- Internal Behaviour ---
 
     def _build_config(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
         return validate_process_data(
@@ -210,3 +135,78 @@ class ProcessStore:
             stop_command=stop_command,
             blacklist=blacklist,
         )
+
+    # --- Internal API ---
+
+    @property
+    def configs(self) -> tuple[ProcessConfig, ...]:
+        """Return a read-only snapshot of loaded process configurations."""
+        return tuple(self._configs)
+
+    def get(self, name: str) -> ProcessConfig | None:
+        """Return a configured process matching ``name`` case-insensitively."""
+        target = name.strip().casefold()
+        return next((proc for proc in self._configs if proc.name.casefold() == target), None)
+
+    def load(self) -> tuple[ProcessConfig, ...]:
+        """Load persisted processes, auto-repairing corrupt, duplicate, or excess entries."""
+        self._configs = self._read_from_disk()
+        return tuple(self._configs)
+
+    def create(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
+        """Validate, persist, and create the working folder for a new process."""
+        config = self._build_config(target, payload)
+        processes = self._read_from_disk()
+        key = config.name.casefold()
+
+        if any(proc.name.casefold() == key for proc in processes):
+            raise ProcessConfigError(f"A process named '{config.name}' already exists.")
+        if len(processes) >= MAX_PROCESSES:
+            raise ProcessConfigError(f'Maximum of {MAX_PROCESSES} processes reached.')
+
+        updated = [*processes, config]
+        self._save_to_disk(updated)
+        try:
+            config.resolve_path().mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise ProcessConfigError(f"Could not create process folder '{config.name}': {exc}") from exc
+
+        self._configs = updated
+        return config
+
+    def update(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
+        """Validate and persist updates to an existing process configuration."""
+        config = self._build_config(target, payload)
+        processes = self._read_from_disk()
+        key = config.name.casefold()
+        match_idx = next((idx for idx, proc in enumerate(processes) if proc.name.casefold() == key), None)
+        if match_idx is None:
+            raise ProcessConfigError(f"Process '{config.name}' was not found.")
+
+        updated = list(processes)
+        updated[match_idx] = config
+        self._save_to_disk(updated)
+        self._configs = updated
+        return config
+
+    def delete(self, target: str) -> ProcessConfig:
+        """Remove a persisted process by name and return the removed configuration."""
+        processes = self._read_from_disk()
+        target_key = target.strip().casefold()
+        removed = next((proc for proc in processes if proc.name.casefold() == target_key), None)
+        if removed is None:
+            raise ProcessConfigError(f"Process '{target}' was not found.")
+
+        updated = [proc for proc in processes if proc.name.casefold() != target_key]
+        self._save_to_disk(updated)
+        self._configs = updated
+        return removed
+
+    async def delete_folder(self, name: str) -> None:
+        """Safely delete the process working directory if it resides under the workspace root."""
+        root = Path.cwd().resolve()
+        candidate_dir = (root / name).resolve()
+        if candidate_dir == root or not candidate_dir.is_relative_to(root):
+            return
+        if candidate_dir.exists():
+            await asyncio.to_thread(shutil.rmtree, candidate_dir)
