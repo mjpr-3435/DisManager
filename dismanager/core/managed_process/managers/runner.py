@@ -30,6 +30,11 @@ class ProcessRunner:
 
     # --- Internal Behaviour ---
 
+    def _notify_first_stop(self) -> None:
+        if not self._stop_requested:
+            self._stop_requested = True
+            self._process_obj._on_process_stop()
+
     def _read_output(
         self,
         proc: subprocess.Popen[bytes],
@@ -119,11 +124,17 @@ class ProcessRunner:
         self._reader_thread.start()
         return loop
 
-    def mark_stop_requested(self) -> bool:
-        """Mark the process as intentionally stopping; return ``True`` on the first stop signal."""
-        first_signal = not self._stop_requested
-        self._stop_requested = True
-        return first_signal
+    def stop(self) -> bool:
+        """Request a graceful stop via ``stop_command``, or fall back to ``kill()``."""
+        if not self.is_alive:
+            return False
+
+        stop_command = self._process_obj._config.stop_command
+        if not stop_command:
+            return self.kill()
+
+        self._notify_first_stop()
+        return self.execute(stop_command)
 
     def execute(self, command: str) -> bool:
         """Write a command line to the subprocess stdin."""
@@ -138,12 +149,13 @@ class ProcessRunner:
         except OSError:
             return False
 
-    def kill_tree(self) -> bool:
+    def kill(self) -> bool:
         """Forcefully terminate the process and all of its child processes."""
         proc = self._process
-        if proc is None:
+        if proc is None or proc.poll() is not None:
             return False
 
+        self._notify_first_stop()
         with contextlib.suppress(psutil.Error, OSError):
             parent = psutil.Process(proc.pid)
             for child in parent.children(recursive=True):

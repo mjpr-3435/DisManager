@@ -47,6 +47,10 @@ class ManagedProcess:
         self._emit_plugin_event('on_process_log', line)
         self._client._addons_manager.emit('on_process_log', self, line)
 
+    def _on_process_stop(self) -> None:
+        self._emit_plugin_event('on_process_stop')
+        self._client._addons_manager.emit('on_process_stop', self)
+
     def _on_process_exit(self, reason: str | None, crashed: bool) -> None:
         self._logger.close_session()
         self._relay.finish(reason=reason)
@@ -171,26 +175,11 @@ class ManagedProcess:
 
     def stop(self) -> bool:
         """Request a graceful stop via ``stop_command``, or fall back to ``kill()``."""
-        if not self._runner.is_alive:
-            return False
-
-        if not self._config.stop_command:
-            return self.kill()
-
-        if self._runner.mark_stop_requested():
-            self._emit_plugin_event('on_process_stop')
-            self._client._addons_manager.emit('on_process_stop', self)
-        return self.execute(self._config.stop_command)
+        return self._runner.stop()
 
     def kill(self) -> bool:
         """Forcefully terminate the process and all of its child processes."""
-        if not self._runner.is_alive:
-            return False
-
-        if self._runner.mark_stop_requested():
-            self._emit_plugin_event('on_process_stop')
-            self._client._addons_manager.emit('on_process_stop', self)
-        return self._runner.kill_tree()
+        return self._runner.kill()
 
     async def restart(self) -> bool:
         """Stop the process cleanly, wait for exit and relay drain, and start it again."""
