@@ -81,12 +81,17 @@ class _BotCommands(commands.Cog):
 
     @commands.command(name='adreload')
     async def adreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:
-        if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
+        if not await self._accept_panel_command(ctx):
             return
-        with contextlib.suppress(discord.HTTPException):
-            await ctx.message.delete()
         message = await reload_addons_command(self.bot, markdown=True)
         await ctx.send(message, delete_after=2)
+
+    async def _accept_panel_command(self, ctx: commands.Context[DisManagerClient]) -> bool:
+        if ctx.channel.id != self.bot.config.panel_id:
+            return False
+        with contextlib.suppress(discord.HTTPException):
+            await ctx.message.delete()
+        return True
 
     async def _run_process_command(
         self,
@@ -94,11 +99,8 @@ class _BotCommands(commands.Cog):
         action: ProcessAction,
         name: str,
     ) -> None:
-        if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
+        if not await self._accept_panel_command(ctx):
             return
-
-        with contextlib.suppress(discord.HTTPException):
-            await ctx.message.delete()
 
         ok, message = await run_process_action(self.bot, action, name, markdown=True)
         await ctx.send(message, delete_after=2 if ok else 5)
@@ -108,11 +110,8 @@ class _BotCommands(commands.Cog):
         ctx: commands.Context[DisManagerClient],
         action: ProcessAction,
     ) -> None:
-        if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
+        if not await self._accept_panel_command(ctx):
             return
-
-        with contextlib.suppress(discord.HTTPException):
-            await ctx.message.delete()
 
         ok, message = await run_all_processes_action(self.bot, action, markdown=True)
         await ctx.send(message, delete_after=3 if ok else 5)
