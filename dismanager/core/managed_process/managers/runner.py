@@ -135,20 +135,7 @@ class ProcessRunner:
 
         self._notify_first_stop()
         return self.execute(stop_command)
-
-    def execute(self, command: str) -> bool:
-        """Write a command line to the subprocess stdin."""
-        proc = self._process
-        if proc is None or proc.poll() is not None or proc.stdin is None:
-            return False
-
-        try:
-            proc.stdin.write(f'{command}\n'.encode())
-            proc.stdin.flush()
-            return True
-        except OSError:
-            return False
-
+    
     def kill(self) -> bool:
         """Forcefully terminate the process and all of its child processes."""
         proc = self._process
@@ -166,6 +153,20 @@ class ProcessRunner:
         with contextlib.suppress(OSError):
             proc.kill()
         return True
+
+
+    def execute(self, command: str) -> bool:
+        """Write a command line to the subprocess stdin."""
+        proc = self._process
+        if proc is None or proc.poll() is not None or proc.stdin is None:
+            return False
+
+        try:
+            proc.stdin.write(f'{command}\n'.encode())
+            proc.stdin.flush()
+            return True
+        except OSError:
+            return False
 
     def ram_usage_bytes(self) -> int:
         """Return total RSS memory in bytes for the process tree."""
