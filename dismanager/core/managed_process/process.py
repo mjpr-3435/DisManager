@@ -78,6 +78,10 @@ class ManagedProcess:
         if candidate_dir.exists():
             await asyncio.to_thread(shutil.rmtree, candidate_dir)
 
+    async def _send_logs(self) -> None:
+        """Send this process's recent 8 MB log buffer to its Discord console thread."""
+        await self._relay.send_log_file(self._runner.recent_log_bytes())
+
     async def _shutdown(self) -> None:
         """Stop the subprocess gracefully, force-kill after 60 s, and drain its Discord relay."""
         if self._runner.is_alive:
@@ -181,10 +185,6 @@ class ManagedProcess:
             await self._relay.shutdown()
 
         return self.start()
-
-    async def send_logs(self) -> None:
-        """Send this process's recent 8 MB log buffer to its Discord console thread."""
-        await self._relay.send_log_file(self._runner.recent_log_bytes())
 
     def execute(self, command: str) -> bool:
         """Write a command line to the subprocess stdin."""

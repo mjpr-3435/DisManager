@@ -56,7 +56,7 @@ class _BotEvents(commands.Cog):
             if not ok:
                 await message.channel.send(feedback, delete_after=5)
         elif cmd == 'logs':
-            await process.send_logs()
+            await process._send_logs()
         else:
             process.execute(message.content)
 
