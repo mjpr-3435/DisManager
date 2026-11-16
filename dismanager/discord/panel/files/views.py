@@ -6,8 +6,9 @@ from typing import TYPE_CHECKING, Any
 import discord
 
 from ....core.bootstrap.i18n import _
+from ....core.files import clamp_to_root, get_sibling_files, list_directory_entries
 from .actions import DirectoryActionsSelect, FileActionsSelect
-from .embed import build_files_embed, get_max_page, list_directory_entries
+from .embed import ENTRIES_PER_PAGE, build_files_embed, get_max_page
 from .modals import GoToPathModal
 from .preview import build_file_attachment
 
@@ -30,7 +31,7 @@ class FilesView(discord.ui.View):
 
     def render(self, path: Path, *, page: int = 1, size_text: str | None = None) -> discord.Embed:
         """Update view controls for ``path`` (file or directory) and return its embed."""
-        self.path = _clamp_to_root(path, self.root)
+        self.path = clamp_to_root(path, self.root)
         self.clear_items()
         self._select_targets = []
 
@@ -55,7 +56,7 @@ class FilesView(discord.ui.View):
         if not interaction.response.is_done():
             await interaction.response.defer()
 
-        clamped = _clamp_to_root(path, self.root)
+        clamped = clamp_to_root(path, self.root)
         embed = self.render(clamped, page=page, size_text=size_text)
         attachment = build_file_attachment(self.path)
         message = interaction.message
@@ -101,7 +102,7 @@ class FilesView(discord.ui.View):
         self._add_sibling_file_buttons()
 
     def _add_sibling_file_buttons(self) -> None:
-        sibling_info = _get_sibling_files(self.path)
+        sibling_info = get_sibling_files(self.path)
         if sibling_info is None:
             return
         files, idx = sibling_info
@@ -124,9 +125,9 @@ class FilesView(discord.ui.View):
             self.add_item(_SiblingFileButton('>>', target_path=files[-1], disabled=idx >= len(files) - 1))
 
     def _build_select_options(self, dirs: list[Path], files: list[Path]) -> list[discord.SelectOption]:
-        offset = (self.page - 1) * 99
-        page_dirs = dirs[offset : offset + 99]
-        page_files = files[offset : offset + 99]
+        offset = (self.page - 1) * ENTRIES_PER_PAGE
+        page_dirs = dirs[offset : offset + ENTRIES_PER_PAGE]
+        page_files = files[offset : offset + ENTRIES_PER_PAGE]
         targets = [*page_dirs, *page_files][:25]
         self._select_targets = targets
 
@@ -154,19 +155,6 @@ class FilesView(discord.ui.View):
             self.add_item(_PageButton('>>', target_page=self._max_page, disabled=self.page >= self._max_page))
 
 
-def _clamp_to_root(path: Path, root: Path) -> Path:
-    resolved = path.resolve()
-    return resolved if resolved.is_relative_to(root) else root
-
-
-def _get_sibling_files(path: Path) -> tuple[list[Path], int] | None:
-    try:
-        _, files = list_directory_entries(path.parent)
-        return files, files.index(path)
-    except (OSError, ValueError):
-        return None
-
-
 class _FileSelect(discord.ui.Select[FilesView]):
     def __init__(self, placeholder: str, options: list[discord.SelectOption]) -> None:
         super().__init__(placeholder=placeholder, options=options, row=1)
@@ -185,10 +173,10 @@ class _BackButton(discord.ui.Button[FilesView]):
         assert self.view is not None
         parent_page = 1
         if not self.view.path.is_dir():
-            sibling_info = _get_sibling_files(self.view.path)
+            sibling_info = get_sibling_files(self.view.path)
             if sibling_info is not None:
                 _, idx = sibling_info
-                parent_page = idx // 99 + 1
+                parent_page = idx // ENTRIES_PER_PAGE + 1
         await self.view.navigate(interaction, self.view.path.parent, page=parent_page)
 
 

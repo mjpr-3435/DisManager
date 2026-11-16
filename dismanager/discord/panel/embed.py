@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
-from pathlib import Path
-from typing import TYPE_CHECKING, Protocol, cast
+from typing import TYPE_CHECKING
 
 import discord
-import psutil
 
 from ...core.bootstrap.i18n import _
+from ...core.format import format_bytes
 from ...core.managed_process import ManagedProcess
-from .files.embed import format_bytes
+from ...core.system import SystemMetrics, collect_system_metrics
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
@@ -44,22 +43,6 @@ async def update_panel(
 
 
 @dataclass(frozen=True, slots=True)
-class _SystemMetrics:
-    """Host CPU, RAM, disk, and DisManager process metrics."""
-
-    cpu_freq: str
-    cpu_load: str
-    cpu_temp: str
-    ram_total: str
-    ram_used: str
-    ram_load: str
-    disk_total: str
-    disk_used: str
-    disk_load: str
-    app_ram: str
-
-
-@dataclass(frozen=True, slots=True)
 class _ProcessSnapshot:
     name: str
     running: bool
@@ -67,13 +50,8 @@ class _ProcessSnapshot:
     console_thread: discord.Thread | None
 
 
-class _TemperatureSensor(Protocol):
-    label: str
-    current: float
-
-
-def _collect_panel_data(processes: Sequence[ManagedProcess]) -> tuple[_SystemMetrics, list[_ProcessSnapshot]]:
-    metrics = _collect_system_metrics()
+def _collect_panel_data(processes: Sequence[ManagedProcess]) -> tuple[SystemMetrics, list[_ProcessSnapshot]]:
+    metrics = collect_system_metrics()
     snapshots = [
         _ProcessSnapshot(
             name=proc.name,
@@ -86,34 +64,8 @@ def _collect_panel_data(processes: Sequence[ManagedProcess]) -> tuple[_SystemMet
     return metrics, snapshots
 
 
-def _collect_system_metrics() -> _SystemMetrics:
-    """Collect host CPU, RAM, and disk metrics via psutil."""
-    freq = psutil.cpu_freq()
-    cpu_freq = f'{int(freq.current)} MHz' if freq is not None else '—— MHz'
-    cpu_load = f'{psutil.cpu_percent(interval=0.5):.1f} %'
-    cpu_temp = _get_cpu_temp()
-
-    ram = psutil.virtual_memory()
-    disk_root = str(Path.cwd().anchor or '/')
-    disk = psutil.disk_usage(disk_root)
-
-    gb = 1024**3
-    return _SystemMetrics(
-        cpu_freq=cpu_freq,
-        cpu_load=cpu_load,
-        cpu_temp=cpu_temp,
-        ram_total=f'{ram.total / gb:.1f} GB',
-        ram_used=f'{ram.used / gb:.1f} GB',
-        ram_load=f'{ram.percent:.1f} %',
-        disk_total=f'{disk.total / gb:.1f} GB',
-        disk_used=f'{disk.used / gb:.1f} GB',
-        disk_load=f'{disk.percent:.1f} %',
-        app_ram=_get_process_ram(),
-    )
-
-
 def _build_panel_embed(
-    metrics: _SystemMetrics,
+    metrics: SystemMetrics,
     bot_prefix: str,
     *,
     error_thread: discord.Thread,
@@ -245,35 +197,3 @@ def _ansi_block(rows: list[tuple[str, str]], *, header: str | None = None, width
         for label, value in rows
     )
     return '```ansi\n' + '\n'.join(lines) + '\n```'
-
-
-def _get_cpu_temp() -> str:
-    sensors_fn = getattr(psutil, 'sensors_temperatures', None)
-    if sensors_fn is None:
-        return '—— °C'
-
-    try:
-        temps = cast(Mapping[str, Sequence[_TemperatureSensor]], sensors_fn())
-        for sensor in ('coretemp', 'k10temp'):
-            if sensor not in temps:
-                continue
-            for temp in temps[sensor]:
-                label = temp.label.lower()
-                if 'package id' in label or 'tdie' in label or 'tctl' in label:
-                    return f'{int(temp.current)} °C'
-    except Exception:
-        pass
-
-    return '—— °C'
-
-
-def _get_process_ram() -> str:
-    try:
-        rss: float = float(psutil.Process().memory_info().rss)
-        for unit in ('B', 'KB', 'MB', 'GB', 'TB'):
-            if rss < 1024 or unit == 'TB':
-                return f'{rss:.1f} {unit}'
-            rss /= 1024
-    except Exception:
-        pass
-    return '———'

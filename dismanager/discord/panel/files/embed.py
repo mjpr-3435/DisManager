@@ -1,49 +1,21 @@
 from __future__ import annotations
 
 import math
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 
 import discord
 
+from ....core.files import get_sibling_files, list_directory_entries, to_dismanager_path
+from ....core.format import format_bytes
 from .preview import populate_file_preview
 
-
-def to_dismanager_path(path: Path, root: Path) -> str:
-    """Format a filesystem path under ``root`` with the ``DisManager`` mask."""
-    resolved = path.resolve()
-    resolved_root = root.resolve()
-    if resolved == resolved_root:
-        return 'DisManager'
-
-    rel = resolved.relative_to(resolved_root)
-    return f'DisManager/{rel.as_posix()}'
-
-
-def list_directory_entries(path: Path) -> tuple[list[Path], list[Path]]:
-    """Return sorted ``(dirs, files)`` entries inside ``path``."""
-    entries = sorted(path.iterdir(), key=lambda entry: entry.name.lower())
-    dirs = [entry for entry in entries if entry.is_dir()]
-    files = [entry for entry in entries if entry.is_file()]
-    return dirs, files
+ENTRIES_PER_PAGE = 99
 
 
 def get_max_page(dir_count: int, file_count: int) -> int:
     """Return the total number of pages for the given directory and file counts."""
-    return max(1, math.ceil(dir_count / 99), math.ceil(file_count / 99))
-
-
-def format_bytes(total: int) -> str:
-    """Format a byte count into a human-readable size string."""
-    units = ('B', 'KB', 'MB', 'GB', 'TB')
-    unit_idx = min(int(math.log(total, 1024)), len(units) - 1) if total > 0 else 0
-    return f'{total / (1024**unit_idx):.1f} {units[unit_idx]}'
-
-
-def compute_path_size(path: Path) -> str:
-    """Compute human-readable total size of a file or directory tree."""
-    return format_bytes(_get_size_bytes(path))
+    return max(1, math.ceil(dir_count / ENTRIES_PER_PAGE), math.ceil(file_count / ENTRIES_PER_PAGE))
 
 
 def build_files_embed(
@@ -112,12 +84,13 @@ def _populate_file_embed(embed: discord.Embed, path: Path) -> None:
     size = format_bytes(stat.st_size)
     modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).astimezone().strftime('%Y-%m-%d %H:%M')
     footer_parts = [f'Size: {size}', f'Modified: {modified}']
-    position = _get_file_position(path)
-    if position is not None:
-        idx, total_files = position
-        file_page = idx // 99 + 1
-        total_pages = max(1, math.ceil(total_files / 99))
-        page_idx = (idx % 99) + 1
+    sibling_info = get_sibling_files(path)
+    if sibling_info is not None:
+        files, idx = sibling_info
+        total_files = len(files)
+        file_page = idx // ENTRIES_PER_PAGE + 1
+        total_pages = max(1, math.ceil(total_files / ENTRIES_PER_PAGE))
+        page_idx = (idx % ENTRIES_PER_PAGE) + 1
         file_label = (
             f'File {page_idx:02d} (#{idx + 1}/{total_files})'
             if total_pages > 1
@@ -127,43 +100,9 @@ def _populate_file_embed(embed: discord.Embed, path: Path) -> None:
     embed.set_footer(text=' | '.join(footer_parts))
 
 
-def _get_file_position(path: Path) -> tuple[int, int] | None:
-    try:
-        _, sibling_files = list_directory_entries(path.parent)
-        return sibling_files.index(path), len(sibling_files)
-    except (OSError, ValueError):
-        return None
-
-
-def _get_size_bytes(path: Path) -> int:
-    try:
-        if not path.is_dir():
-            return path.stat(follow_symlinks=False).st_size
-    except OSError:
-        return 0
-
-    total = 0
-    stack: list[Path] = [path]
-    while stack:
-        current = stack.pop()
-        try:
-            with os.scandir(current) as it:
-                for entry in it:
-                    try:
-                        if entry.is_dir(follow_symlinks=False):
-                            stack.append(Path(entry.path))
-                        else:
-                            total += entry.stat(follow_symlinks=False).st_size
-                    except OSError:
-                        continue
-        except OSError:
-            continue
-    return total
-
-
 def _build_columns(items: list[Path], emoji: str, page: int) -> list[str]:
-    offset = (page - 1) * 99
-    paginated = items[offset : offset + 99]
+    offset = (page - 1) * ENTRIES_PER_PAGE
+    paginated = items[offset : offset + ENTRIES_PER_PAGE]
     if not paginated:
         return []
 

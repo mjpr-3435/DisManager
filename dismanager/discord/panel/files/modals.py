@@ -1,15 +1,26 @@
 from __future__ import annotations
 
 import asyncio
-import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 import discord
 
 from ....core.bootstrap.i18n import _
+from ....core.files import (
+    MAX_EDITABLE_TEXT_CHARS,
+    FileActionError,
+    create_directory,
+    delete_entry,
+    list_directory_entries,
+    rename_entry,
+    resolve_dismanager_path,
+    resolve_upload_path,
+    to_dismanager_path,
+    write_text_file,
+)
 from ...utils import confirmation_request
-from .embed import list_directory_entries, to_dismanager_path
+from .embed import ENTRIES_PER_PAGE
 
 if TYPE_CHECKING:
     from .views import FilesView
@@ -31,7 +42,7 @@ class GoToPathModal(discord.ui.Modal):
         self.add_item(self.path_input)
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
-        target = _resolve_dismanager_path(self.path_input.value, self._files_view.root)
+        target = resolve_dismanager_path(self.path_input.value, self._files_view.root)
         if target is None:
             await interaction.response.send_message(
                 _('✖ The path must exist inside `DisManager`. E.g.: `DisManager/logs`.'),
@@ -59,7 +70,7 @@ class IndexActionModal(discord.ui.Modal):
         self._index_input: discord.ui.TextInput[Any] = discord.ui.TextInput(
             label=_('Index'),
             style=discord.TextStyle.short,
-            placeholder='1 - 99',
+            placeholder=f'1 - {ENTRIES_PER_PAGE}',
             max_length=2,
         )
         self.add_item(discord.ui.Label(text=_('Type'), component=self._kind_select))
@@ -84,9 +95,9 @@ class IndexActionModal(discord.ui.Modal):
             )
             return
 
-        offset = (self._files_view.page - 1) * 99
+        offset = (self._files_view.page - 1) * ENTRIES_PER_PAGE
         kind = self._kind_select.values[0]
-        entries = (dirs if kind == 'dir' else files)[offset : offset + 99]
+        entries = (dirs if kind == 'dir' else files)[offset : offset + ENTRIES_PER_PAGE]
 
         if index < 1 or index > len(entries):
             await interaction.response.send_message(
@@ -109,16 +120,9 @@ class IndexActionModal(discord.ui.Modal):
 
         async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
             try:
-                if resolved.is_dir():
-                    await asyncio.to_thread(shutil.rmtree, resolved)
-                else:
-                    await asyncio.to_thread(resolved.unlink)
-            except OSError as exc:
-                await confirm_interaction.response.edit_message(
-                    content=_('✖ Could not delete `{}`: {}').format(resolved.name, exc),
-                    embed=None,
-                    view=None,
-                )
+                await asyncio.to_thread(delete_entry, resolved, self._files_view.root)
+            except FileActionError as exc:
+                await confirm_interaction.response.edit_message(content=str(exc), embed=None, view=None)
                 return
 
             await confirm_interaction.response.edit_message(delete_after=0)
@@ -150,30 +154,10 @@ class CreateDirModal(discord.ui.Modal):
         self.add_item(self.name_input)
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
-        name = self.name_input.value.strip()
-        target_dir = self._files_view.path.resolve()
-        dest = (target_dir / name).resolve()
-        if not _is_valid_entry_name(name) or dest.parent != target_dir:
-            await interaction.response.send_message(
-                _('✖ Invalid directory name.'),
-                ephemeral=True,
-            )
-            return
-
-        if dest.exists():
-            await interaction.response.send_message(
-                _('✖ `{}` already exists.').format(name),
-                ephemeral=True,
-            )
-            return
-
         try:
-            dest.mkdir()
-        except OSError as exc:
-            await interaction.response.send_message(
-                _('✖ Could not create directory: {}').format(exc),
-                ephemeral=True,
-            )
+            create_directory(self._files_view.path, self._files_view.root, self.name_input.value)
+        except FileActionError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
         await self._files_view.navigate(interaction, self._files_view.path, page=self._files_view.page)
@@ -197,40 +181,18 @@ class RenameModal(discord.ui.Modal):
         self.add_item(self.name_input)
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
-        new_name = self.name_input.value.strip()
         target = self._files_view.path.resolve()
         if target == self._files_view.root or not target.is_relative_to(self._files_view.root):
             return
 
-        if new_name == target.name:
-            await self._files_view.navigate(interaction, target, page=self._files_view.page)
-            return
-
-        dest = (target.parent / new_name).resolve()
-        if not _is_valid_entry_name(new_name) or dest.parent != target.parent:
-            await interaction.response.send_message(
-                _('✖ Invalid name.'),
-                ephemeral=True,
-            )
-            return
-
-        if dest.exists():
-            await interaction.response.send_message(
-                _('✖ `{}` already exists.').format(new_name),
-                ephemeral=True,
-            )
-            return
-
         try:
-            target.rename(dest)
-        except OSError as exc:
-            await interaction.response.send_message(
-                _('✖ Could not rename: {}').format(exc),
-                ephemeral=True,
-            )
+            dest = rename_entry(target, self._files_view.root, self.name_input.value)
+        except FileActionError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
-        await self._files_view.navigate(interaction, dest)
+        page = self._files_view.page if dest == target else 1
+        await self._files_view.navigate(interaction, dest, page=page)
 
 
 class UploadModal(discord.ui.Modal):
@@ -269,24 +231,26 @@ class UploadModal(discord.ui.Modal):
         )
 
         overwrite = self._overwrite.value
-        target_dir = self._files_view.path.resolve()
         saved: list[str] = []
         skipped: list[str] = []
         failed: list[str] = []
 
         for idx, attachment in enumerate(attachments, start=1):
-            filename = Path(attachment.filename).name
-            dest = (target_dir / filename).resolve()
-            if not filename or not dest.is_relative_to(target_dir):
+            dest = resolve_upload_path(
+                attachment.filename,
+                self._files_view.path,
+                self._files_view.root,
+            )
+            if dest is None:
                 failed.append(attachment.filename)
             elif dest.exists() and not overwrite:
-                skipped.append(filename)
+                skipped.append(dest.name)
             else:
                 try:
                     await attachment.save(dest)
-                    saved.append(filename)
+                    saved.append(dest.name)
                 except (OSError, discord.HTTPException):
-                    failed.append(filename)
+                    failed.append(dest.name)
 
             if idx < total:
                 await status_msg.edit(content=self._format_progress(idx, total, saved, skipped, failed))
@@ -341,42 +305,18 @@ class EditFileModal(discord.ui.Modal):
             style=discord.TextStyle.paragraph,
             default=content,
             required=False,
-            max_length=4000,
+            max_length=MAX_EDITABLE_TEXT_CHARS,
         )
         self.add_item(self.content_input)
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
         try:
-            self._target.write_text(self.content_input.value, encoding='utf-8')
-        except OSError as exc:
-            await interaction.response.send_message(
-                _('✖ Could not save file: {}').format(exc),
-                ephemeral=True,
-            )
+            write_text_file(self._target, self._files_view.root, self.content_input.value)
+        except FileActionError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
         await interaction.response.send_message(
             _('✔ Saved `{}`.').format(self._target.name),
             ephemeral=True,
         )
-
-
-# =========================================
-#            Internal Helpers
-# =========================================
-
-
-def _is_valid_entry_name(name: str) -> bool:
-    return bool(name) and name not in {'.', '..'} and not any(ch in name for ch in '<>:"/\\|?*')
-
-
-def _resolve_dismanager_path(raw_path: str, root: Path) -> Path | None:
-    cleaned = raw_path.strip().replace('\\', '/')
-    parts = [part for part in cleaned.split('/') if part]
-    if not parts or parts[0] != 'DisManager':
-        return None
-
-    candidate = root.joinpath(*parts[1:]).resolve()
-    if not candidate.is_relative_to(root) or not candidate.exists():
-        return None
-    return candidate

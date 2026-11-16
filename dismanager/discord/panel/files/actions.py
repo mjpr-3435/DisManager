@@ -1,17 +1,26 @@
 from __future__ import annotations
 
 import asyncio
-import shutil
-import tempfile
+import contextlib
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import discord
 
 from ....core.bootstrap.i18n import _
+from ....core.files import (
+    FileActionError,
+    compress_directory,
+    delete_entry,
+    extract_archive,
+    is_editable_text,
+    path_size_bytes,
+    read_file_size,
+    read_text_for_edit,
+    to_dismanager_path,
+)
+from ....core.format import format_bytes
 from ...utils import confirmation_request
-from .archives import run_unzip_command, run_zip_command
-from .embed import compute_path_size, format_bytes, to_dismanager_path
 from .modals import CreateDirModal, EditFileModal, IndexActionModal, RenameModal, UploadModal
 
 if TYPE_CHECKING:
@@ -77,7 +86,7 @@ class DirectoryActionsSelect(discord.ui.Select['FilesView']):
             await interaction.response.send_modal(IndexActionModal(self.view, mode='delete'))
         elif action == 'size':
             await interaction.response.defer()
-            size_text = await asyncio.to_thread(compute_path_size, self.view.path)
+            size_text = format_bytes(await asyncio.to_thread(path_size_bytes, self.view.path))
             await self.view.navigate(interaction, self.view.path, page=self.view.page, size_text=size_text)
         elif action == 'mkdir':
             await interaction.response.send_modal(CreateDirModal(self.view))
@@ -112,30 +121,7 @@ class DirectoryActionsSelect(discord.ui.Select['FilesView']):
                 ephemeral=True,
             )
             return
-        if not target.is_relative_to(files_view.root):
-            return
-
-        async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
-            try:
-                await asyncio.to_thread(shutil.rmtree, target)
-            except OSError as exc:
-                await confirm_interaction.response.edit_message(
-                    content=_('✖ Could not delete directory: {}').format(exc),
-                    embed=None,
-                    view=None,
-                )
-                return
-
-            await confirm_interaction.response.edit_message(delete_after=0)
-            await files_view.navigate(interaction, target.parent)
-
-        await confirmation_request(
-            _('Are you sure you want to delete `{}`?').format(
-                to_dismanager_path(target, files_view.root)
-            ),
-            interaction=interaction,
-            on_confirmation=on_confirmation,
-        )
+        await _confirm_delete_entry(files_view, interaction, target)
 
     async def _confirm_zip(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -151,17 +137,20 @@ class DirectoryActionsSelect(discord.ui.Select['FilesView']):
             progress_text = _('Compressing `{}`...').format(zip_name)
             await confirm_interaction.response.edit_message(content=progress_text, embed=None, view=None)
 
-            tmp_dir = Path(tempfile.mkdtemp(prefix='dismanager_zip_'))
-            tmp_zip = tmp_dir / zip_name
+            async def on_progress(processed: int, total: int, size_bytes: int) -> None:
+                prefix = f'`[{min(processed, total)}/{total}]` ' if total > 0 else ''
+                suffix = f' ({format_bytes(size_bytes)})' if size_bytes > 0 else ''
+                with contextlib.suppress(discord.HTTPException):
+                    await confirm_interaction.edit_original_response(content=prefix + progress_text + suffix)
+
             try:
-                rc = await run_zip_command(target, tmp_zip, zip_name, confirm_interaction, progress_text)
-                if rc != 0 or not tmp_zip.exists():
+                rc = await compress_directory(target, zip_path, on_progress=on_progress)
+                if rc != 0 or not zip_path.exists():
                     await confirm_interaction.edit_original_response(
                         content=_('✖ Failed to compress `{}` (exit code {}).').format(zip_name, rc)
                     )
                     return
 
-                await asyncio.to_thread(shutil.move, str(tmp_zip), str(zip_path))
                 await files_view.navigate(interaction, target, page=files_view.page)
                 await confirm_interaction.edit_original_response(
                     content=_('✔ Compressed into `{}`.').format(zip_name)
@@ -170,8 +159,6 @@ class DirectoryActionsSelect(discord.ui.Select['FilesView']):
                 await confirm_interaction.edit_original_response(
                     content=_('✖ Failed to compress `{}`: {}').format(zip_name, exc)
                 )
-            finally:
-                shutil.rmtree(tmp_dir, ignore_errors=True)
 
         await confirmation_request(
             _(
@@ -199,7 +186,7 @@ class FileActionsSelect(discord.ui.Select['FilesView']):
                 description=_('Rename this file'),
             ),
         ]
-        if _is_editable_text(path):
+        if is_editable_text(path):
             options.append(
                 discord.SelectOption(
                     label=_('Edit file'),
@@ -238,17 +225,14 @@ class FileActionsSelect(discord.ui.Select['FilesView']):
         elif action == 'unzip':
             await self._confirm_unzip(interaction, target)
         elif action == 'delete':
-            await self._confirm_delete(interaction, target)
+            await _confirm_delete_entry(self.view, interaction, target)
 
     async def _download(self, interaction: discord.Interaction[Any], target: Path) -> None:
         assert self.view is not None
         try:
-            size = target.stat().st_size
-        except OSError as exc:
-            await interaction.response.send_message(
-                _('✖ Could not read file: {}').format(exc),
-                ephemeral=True,
-            )
+            size = read_file_size(target)
+        except FileActionError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
         limit = interaction.guild.filesize_limit if interaction.guild is not None else 10 * 1024 * 1024
@@ -272,19 +256,9 @@ class FileActionsSelect(discord.ui.Select['FilesView']):
     async def _open_edit(self, interaction: discord.Interaction[Any], target: Path) -> None:
         assert self.view is not None
         try:
-            content = target.read_text(encoding='utf-8')
-        except (OSError, UnicodeDecodeError) as exc:
-            await interaction.response.send_message(
-                _('✖ Could not read file: {}').format(exc),
-                ephemeral=True,
-            )
-            return
-
-        if len(content) > 4000:
-            await interaction.response.send_message(
-                _('✖ File exceeds the 4000-character modal limit.'),
-                ephemeral=True,
-            )
+            content = read_text_for_edit(target)
+        except FileActionError as exc:
+            await interaction.response.send_message(str(exc), ephemeral=True)
             return
 
         await interaction.response.send_modal(EditFileModal(self.view, target, content))
@@ -298,8 +272,13 @@ class FileActionsSelect(discord.ui.Select['FilesView']):
             progress_text = _('Extracting `{}`...').format(target.name)
             await confirm_interaction.response.edit_message(content=progress_text, embed=None, view=None)
 
+            async def on_progress(processed: int, total: int) -> None:
+                prefix = f'`[{min(processed, total)}/{total}]` ' if total > 0 else ''
+                with contextlib.suppress(discord.HTTPException):
+                    await confirm_interaction.edit_original_response(content=prefix + progress_text)
+
             try:
-                rc = await run_unzip_command(target, dest_dir, confirm_interaction, progress_text)
+                rc = await extract_archive(target, dest_dir, on_progress=on_progress)
                 if rc != 0:
                     await confirm_interaction.edit_original_response(
                         content=_('✖ Failed to extract `{}` (exit code {}).').format(target.name, rc)
@@ -323,50 +302,34 @@ class FileActionsSelect(discord.ui.Select['FilesView']):
             on_confirmation=on_confirmation,
         )
 
-    async def _confirm_delete(self, interaction: discord.Interaction[Any], target: Path) -> None:
-        assert self.view is not None
-        files_view = self.view
-        if not target.is_relative_to(files_view.root):
-            return
-
-        async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
-            try:
-                await asyncio.to_thread(target.unlink)
-            except OSError as exc:
-                await confirm_interaction.response.edit_message(
-                    content=_('✖ Could not delete `{}`: {}').format(target.name, exc),
-                    embed=None,
-                    view=None,
-                )
-                return
-
-            await confirm_interaction.response.edit_message(delete_after=0)
-            await files_view.navigate(interaction, target.parent)
-
-        await confirmation_request(
-            _('Are you sure you want to delete `{}`?').format(
-                to_dismanager_path(target, files_view.root)
-            ),
-            interaction=interaction,
-            on_confirmation=on_confirmation,
-        )
-
 
 # =========================================
 #            Internal Helpers
 # =========================================
 
 
-def _is_editable_text(path: Path) -> bool:
-    try:
-        if path.stat().st_size > 16 * 1024:
-            return False
-        raw = path.read_bytes()
-    except OSError:
-        return False
-    if b'\x00' in raw:
-        return False
-    try:
-        return len(raw.decode('utf-8')) <= 4000
-    except UnicodeDecodeError:
-        return False
+async def _confirm_delete_entry(
+    files_view: FilesView,
+    interaction: discord.Interaction[Any],
+    target: Path,
+) -> None:
+    if not target.is_relative_to(files_view.root):
+        return
+
+    async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
+        try:
+            await asyncio.to_thread(delete_entry, target, files_view.root)
+        except FileActionError as exc:
+            await confirm_interaction.response.edit_message(content=str(exc), embed=None, view=None)
+            return
+
+        await confirm_interaction.response.edit_message(delete_after=0)
+        await files_view.navigate(interaction, target.parent)
+
+    await confirmation_request(
+        _('Are you sure you want to delete `{}`?').format(
+            to_dismanager_path(target, files_view.root)
+        ),
+        interaction=interaction,
+        on_confirmation=on_confirmation,
+    )

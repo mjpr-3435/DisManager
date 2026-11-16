@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 import discord
 
 from ....core.bootstrap.i18n import _
+from ....core.format import format_bytes
 from ...utils import confirmation_request
-from ..files.embed import format_bytes
 
 if TYPE_CHECKING:
     from ....core.managed_process import BackupEntry, ManagedProcess
