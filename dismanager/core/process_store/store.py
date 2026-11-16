@@ -28,6 +28,24 @@ class ProcessStore:
 
     # --- Internal Behaviour ---
 
+    def _save_to_disk(self, processes: Sequence[ProcessConfig]) -> None:
+        """Persist process definitions atomically to disk."""
+        payload = [asdict(proc) for proc in processes]
+
+        try:
+            _PROCESSES_FILE.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path = _PROCESSES_FILE.with_suffix(f'{_PROCESSES_FILE.suffix}.tmp')
+            tmp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+            tmp_path.replace(_PROCESSES_FILE)
+        except OSError as exc:
+            raise ProcessConfigError(f"Could not save '{_PROCESSES_FILE}': {exc}") from exc
+
+    def _safe_reset_store(self) -> None:
+        try:
+            self._save_to_disk([])
+        except ProcessConfigError as exc:
+            _logger.warning("Could not reset process store '%s': %s", _PROCESSES_FILE, exc)
+
     def _read_from_disk(self) -> list[ProcessConfig]:
         if not _PROCESSES_FILE.exists():
             return []
@@ -78,33 +96,7 @@ class ProcessStore:
                 _logger.warning("Could not save repaired process store '%s': %s", _PROCESSES_FILE, exc)
 
         return processes
-
-    def _build_config(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
-        return validate_process_data(
-            name=target,
-            start_command=payload['start_command'],
-            stop_command=payload['stop_command'],
-            blacklist=payload['blacklist'],
-        )
-
-    def _safe_reset_store(self) -> None:
-        try:
-            self._save_to_disk([])
-        except ProcessConfigError as exc:
-            _logger.warning("Could not reset process store '%s': %s", _PROCESSES_FILE, exc)
-
-    def _save_to_disk(self, processes: Sequence[ProcessConfig]) -> None:
-        """Persist process definitions atomically to disk."""
-        payload = [asdict(proc) for proc in processes]
-
-        try:
-            _PROCESSES_FILE.parent.mkdir(parents=True, exist_ok=True)
-            tmp_path = _PROCESSES_FILE.with_suffix(f'{_PROCESSES_FILE.suffix}.tmp')
-            tmp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-            tmp_path.replace(_PROCESSES_FILE)
-        except OSError as exc:
-            raise ProcessConfigError(f"Could not save '{_PROCESSES_FILE}': {exc}") from exc
-
+    
     def _parse_process_entry(self, raw: object, *, index: int) -> ProcessConfig:
         if not isinstance(raw, Mapping):
             raise ProcessConfigError(f'Process entry #{index + 1} must be a JSON object.')
@@ -126,6 +118,14 @@ class ProcessStore:
             start_command=start_command,
             stop_command=stop_command,
             blacklist=blacklist,
+        )
+
+    def _build_config(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
+        return validate_process_data(
+            name=target,
+            start_command=payload['start_command'],
+            stop_command=payload['stop_command'],
+            blacklist=payload['blacklist'],
         )
 
     # --- Internal API ---
