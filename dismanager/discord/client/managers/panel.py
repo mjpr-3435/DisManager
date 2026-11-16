@@ -24,15 +24,15 @@ _logger = logging.getLogger(__name__)
 class PanelManager:
     """Manages the Discord panel channel, refresh loop, Error Reports thread, and offline state."""
 
-    channel     : discord.TextChannel | None
-    error_thread: discord.Thread | None
-    _message    : discord.Message | None
-    _task       : asyncio.Task[None] | None
+    _channel     : discord.TextChannel | None
+    _error_thread: discord.Thread | None
+    _message     : discord.Message | None
+    _task        : asyncio.Task[None] | None
 
     def __init__(self, client: DisManagerClient) -> None:
         self._client        = client
-        self.channel        = None
-        self.error_thread   = None
+        self._channel       = None
+        self._error_thread  = None
         self._message       = None
         self._task          = None
         self._refresh_event = asyncio.Event()
@@ -54,7 +54,7 @@ class PanelManager:
         return channel
 
     async def _loop(self) -> None:
-        assert self.channel is not None
+        assert self._channel is not None
         include_view = True
         while not self._client.is_closed():
             self._refresh_event.clear()
@@ -64,9 +64,9 @@ class PanelManager:
                 include_view = False
             except (aiohttp.ClientError, discord.HTTPException):
                 with contextlib.suppress(Exception):
-                    fetched = await self._client.fetch_channel(self.channel.id)
+                    fetched = await self._client.fetch_channel(self._channel.id)
                     if isinstance(fetched, discord.TextChannel):
-                        self.channel = fetched
+                        self._channel = fetched
             except Exception:
                 await self._client.report_error('Panel')
 
@@ -86,20 +86,30 @@ class PanelManager:
 
     # --- Internal API ---
 
+    @property
+    def channel(self) -> discord.TextChannel | None:
+        """Return the resolved Discord panel channel, if available."""
+        return self._channel
+
+    @property
+    def error_thread(self) -> discord.Thread | None:
+        """Return the Error Reports thread, if initialized."""
+        return self._error_thread
+
     async def ensure_error_thread(self) -> discord.Thread | None:
         """Return the Error Reports thread, creating it if needed."""
-        if self.error_thread is None and self.channel is not None:
+        if self._error_thread is None and self._channel is not None:
             with contextlib.suppress(Exception):
-                self.error_thread = await get_or_create_thread(self.channel, _ERROR_THREAD_NAME)
-        return self.error_thread
-    
+                self._error_thread = await get_or_create_thread(self._channel, _ERROR_THREAD_NAME)
+        return self._error_thread
+
     async def validate_channel(self) -> bool:
         """Validate the configured panel channel and initialize its Error Reports thread."""
         channel = self._resolve_channel()
         if channel is None:
             return False
-        self.channel = channel
-        self.error_thread = await get_or_create_thread(channel, _ERROR_THREAD_NAME)
+        self._channel = channel
+        self._error_thread = await get_or_create_thread(channel, _ERROR_THREAD_NAME)
         return True
 
     def refresh(self) -> None:
