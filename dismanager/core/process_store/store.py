@@ -142,16 +142,16 @@ class ProcessStore:
     def configs(self) -> tuple[ProcessConfig, ...]:
         """Return a read-only snapshot of loaded process configurations."""
         return tuple(self._configs)
+    
+    def load(self) -> tuple[ProcessConfig, ...]:
+        """Load persisted processes, auto-repairing corrupt, duplicate, or excess entries."""
+        self._configs = self._read_from_disk()
+        return tuple(self._configs)
 
     def get(self, name: str) -> ProcessConfig | None:
         """Return a configured process matching ``name`` case-insensitively."""
         target = name.strip().casefold()
         return next((proc for proc in self._configs if proc.name.casefold() == target), None)
-
-    def load(self) -> tuple[ProcessConfig, ...]:
-        """Load persisted processes, auto-repairing corrupt, duplicate, or excess entries."""
-        self._configs = self._read_from_disk()
-        return tuple(self._configs)
 
     def create(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
         """Validate, persist, and create the working folder for a new process."""
