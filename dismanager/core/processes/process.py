@@ -5,7 +5,6 @@ import contextlib
 import os
 import re
 import shlex
-import signal
 import subprocess
 import threading
 from pathlib import Path
@@ -160,25 +159,20 @@ class ManagedProcess:
         loop.create_task(self._plugins.call_plugins(event_name, *args))
 
     def stop(self) -> bool:
-        """Request a graceful stop via ``stop_command`` or OS signal."""
+        """Request a graceful stop via ``stop_command``, or fall back to ``kill()``."""
         proc = self._process
         if proc is None or proc.poll() is not None:
             return False
+
+        if not self._config.stop_command:
+            return self.kill()
 
         should_emit_stop = not self._stop_requested
         self._stop_requested = True
         if should_emit_stop:
             self.emit_plugin_event('on_process_stop')
             self._client._emit_addon_event('on_process_stop', self)
-        if self._config.stop_command:
-            return self.execute(self._config.stop_command)
-
-        with contextlib.suppress(OSError):
-            if os.name == 'nt':
-                proc.send_signal(signal.CTRL_BREAK_EVENT)
-            else:
-                proc.send_signal(signal.SIGINT)
-        return True
+        return self.execute(self._config.stop_command)
 
     def kill(self) -> bool:
         """Forcefully terminate the process and all of its child processes."""
