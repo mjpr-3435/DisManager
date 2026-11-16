@@ -12,6 +12,7 @@ from ....core.bootstrap.i18n import _
 from ....core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
+    from ....core.processes import ManagedProcess
     from ..client import DisManagerClient
 
 
@@ -29,7 +30,10 @@ class ConsoleManager:
 
     async def _loop(self) -> None:
         """Read console commands asynchronously without blocking the event loop."""
-        header = f"{_('Commands')}: start, stop, restart, kill, plreload, adreload, status, exit"
+        header = (
+            f"{_('Commands')}: "
+            'start[-all], stop[-all], restart[-all], kill[-all], plreload[-all], adreload, status, exit'
+        )
         loop = asyncio.get_running_loop()
         # Bridge queue between the blocking stdin thread and the asyncio event loop (None signals EOF).
         lines: asyncio.Queue[str | None] = asyncio.Queue()
@@ -94,6 +98,11 @@ class ConsoleManager:
             print(await self._process_action(action, arg))
             return True
 
+        if cmd in ('start-all', 'stop-all', 'restart-all', 'kill-all', 'plreload-all'):
+            action = cast(Literal['start', 'stop', 'restart', 'kill', 'plreload'], cmd.removesuffix('-all'))
+            print(await self._process_action_all(action))
+            return True
+
         if cmd == 'status':
             print(self._status())
             return True
@@ -104,36 +113,56 @@ class ConsoleManager:
     async def _process_action(self, action: Literal['start', 'stop', 'restart', 'kill', 'plreload'], name: str) -> str:
         target = name.strip()
         if not target:
-            return _('Specify the process. E.g.: {} <name>').format(action)
+            return _('Specify the process. E.g.: {} <name> or {}-all').format(action, action)
 
         process = self._client.find_process(target)
         if process is None:
             return _("Process '{}' not found.").format(target)
 
+        _ok, message = await self._execute_process_action(process, action)
+        return message
+
+    async def _process_action_all(self, action: Literal['start', 'stop', 'restart', 'kill', 'plreload']) -> str:
+        processes = self._client.processes
+        if not processes:
+            return _('No processes configured.')
+
+        lines: list[str] = []
+        for process in processes:
+            ok, message = await self._execute_process_action(process, action)
+            if ok or action == 'start':
+                lines.append(f'  {message}')
+        return '\n'.join(lines) if lines else _('No eligible processes for {}.').format(action)
+
+    async def _execute_process_action(
+        self,
+        process: ManagedProcess,
+        action: Literal['start', 'stop', 'restart', 'kill', 'plreload'],
+    ) -> tuple[bool, str]:
         if action == 'start':
             if process.is_running():
-                return _('[{}]: The process is already running.').format(process.name)
+                return False, _('[{}]: The process is already running.').format(process.name)
             try:
                 process.start()
             except ProcessConfigError as exc:
-                return f'[{process.name}]: {exc}'
-            return _('[{}]: Initializing process.').format(process.name)
+                return False, f'[{process.name}]: {exc}'
+            return True, _('[{}]: Initializing process.').format(process.name)
 
         if not process.is_running():
-            return _('[{}]: The process is not running.').format(process.name)
+            return False, _('[{}]: The process is not running.').format(process.name)
 
         if action == 'stop':
             process.stop()
-            return _('[{}]: Stopping process.').format(process.name)
+            return True, _('[{}]: Stopping process.').format(process.name)
         if action == 'kill':
             process.kill()
-            return _('[{}]: Killing process.').format(process.name)
+            return True, _('[{}]: Killing process.').format(process.name)
         if action == 'restart':
             asyncio.create_task(process.restart())
-            return _('[{}]: Restarting process.').format(process.name)
+            return True, _('[{}]: Restarting process.').format(process.name)
         if action == 'plreload':
             count = await process.reload_plugins()
-            return _('[{}]: Reloaded {} plugin(s).').format(process.name, count)
+            return True, _('[{}]: Reloaded {} plugin(s).').format(process.name, count)
         raise ValueError(f'Unsupported process action: {action}')
 
     def _status(self) -> str:
