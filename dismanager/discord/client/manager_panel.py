@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
+from importlib.metadata import version
 from typing import TYPE_CHECKING
 
 import aiohttp
@@ -15,6 +17,7 @@ if TYPE_CHECKING:
 
 _PANEL_REFRESH_SECONDS = 15
 _ERROR_THREAD_NAME = 'Error Reports'
+_logger = logging.getLogger(__name__)
 
 
 class PanelManager:
@@ -50,52 +53,35 @@ class PanelManager:
         return channel
 
     async def _loop(self) -> None:
+        assert self.channel is not None
         include_view = True
         while not self._client.is_closed():
             self._refresh_event.clear()
-            if self.channel is not None and self._client.user is not None:
-                try:
-                    view = PanelView(self._client) if include_view else None
-                    self._message = await update_panel(
-                        self.channel,
-                        self._client.user.id,
-                        self._client._config.bot_prefix,
-                        self._client._,
-                        error_thread=self.error_thread,
-                        processes=list(self._client.processes),
-                        view=view,
-                    )
-                    include_view = False
-                except (aiohttp.ClientError, discord.HTTPException):
-                    with contextlib.suppress(Exception):
-                        fetched = await self._client.fetch_channel(self.channel.id)
-                        if isinstance(fetched, discord.TextChannel):
-                            self.channel = fetched
-                except Exception:
-                    await self._client.report_error('Panel')
+            try:
+                view = PanelView(self._client) if include_view else None
+                self._message = await update_panel(self._client, view=view)
+                include_view = False
+            except (aiohttp.ClientError, discord.HTTPException):
+                with contextlib.suppress(Exception):
+                    fetched = await self._client.fetch_channel(self.channel.id)
+                    if isinstance(fetched, discord.TextChannel):
+                        self.channel = fetched
+            except Exception:
+                await self._client.report_error('Panel')
 
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(self._refresh_event.wait(), timeout=_PANEL_REFRESH_SECONDS)
 
     async def _mark_offline(self) -> None:
-        message = self._message
-        if message is None and self.channel is not None and self._client.user is not None:
-            with contextlib.suppress(Exception):
-                async for candidate in self.channel.history(limit=1, oldest_first=True):
-                    if candidate.author.id == self._client.user.id:
-                        message = candidate
-                    break
-
-        if message is None or not message.embeds:
+        if self._message is None or not self._message.embeds:
             return
 
-        embed = message.embeds[0].copy()
-        footer_text = embed.footer.text or 'DisManager'
-        embed.set_footer(text=f"🔴 {footer_text.removeprefix('🟢 ')}")
+        embed = self._message.embeds[0].copy()
+        embed.set_footer(text=f"🔴 DisManager v{version('dismanager')}")
         try:
-            await message.edit(embed=embed)
+            await self._message.edit(embed=embed)
         except Exception as exc:
-            self._client._logger.warning('Failed to mark panel offline: %s', exc)
+            _logger.warning('Failed to mark panel offline: %s', exc)
 
     # --- Internal API ---
 

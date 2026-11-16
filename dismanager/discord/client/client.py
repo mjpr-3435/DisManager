@@ -13,12 +13,12 @@ from ...core.config import DisManagerConfig
 from ...core.i18n import Translator
 from ...core.logs import LogSession
 from ...core.processes import ManagedProcess, ProcessConfig, ProcessDeleteRequest
-from .addons import AddonManager
 from .commands import setup as setup_commands
-from .console import ConsoleManager
 from .events import setup as setup_events
-from .panel import PanelManager
-from .processes import ProcessManager
+from .manager_addons import AddonManager
+from .manager_console import ConsoleManager
+from .manager_panel import PanelManager
+from .manager_processes import ProcessManager
 
 _ERROR_NOTICE_COOLDOWN_SECONDS = 60.0
 

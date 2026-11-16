@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
-from typing import Protocol, cast
+from typing import TYPE_CHECKING, Protocol, cast
 
 import discord
 import psutil
@@ -14,28 +14,30 @@ from ...core.i18n import Translator
 from ...core.processes import ManagedProcess
 from ..files.embed import format_bytes
 
+if TYPE_CHECKING:
+    from ..client import DisManagerClient
+
 
 async def update_panel(
-    channel: discord.TextChannel,
-    bot_user_id: int,
-    bot_prefix: str,
-    translator: Translator,
+    client: DisManagerClient,
     *,
-    processes: Sequence[ManagedProcess],
-    error_thread: discord.Thread | None,
     view: discord.ui.View | None,
 ) -> discord.Message:
     """Collect host metrics and publish or update the DisManager panel embed."""
-    metrics, snapshots = await asyncio.to_thread(_collect_panel_data, processes)
+    channel = client._panel_manager.channel
+    error_thread = client._panel_manager.error_thread
+    assert channel is not None and client.user is not None and error_thread is not None
+
+    metrics, snapshots = await asyncio.to_thread(_collect_panel_data, client.processes)
     embed = _build_panel_embed(
         metrics,
-        bot_prefix,
-        translator,
+        client._config.bot_prefix,
+        client._,
         error_thread=error_thread,
         process_snapshots=snapshots,
         threads=channel.threads,
     )
-    return await _publish_or_update_panel(channel, bot_user_id, embed, view=view)
+    return await _publish_or_update_panel(channel, client.user.id, embed, view=view)
 
 
 # =========================================
@@ -115,7 +117,7 @@ def _build_panel_embed(
     bot_prefix: str,
     translator: Translator,
     *,
-    error_thread: discord.Thread | None,
+    error_thread: discord.Thread,
     process_snapshots: Sequence[_ProcessSnapshot],
     threads: Sequence[discord.Thread],
 ) -> discord.Embed:
@@ -132,10 +134,9 @@ def _build_panel_embed(
             'Additionally, DisManager recognizes the following commands in the following instances:\n'
         )
         + f'- {translator("Console")} : {console_cmds}\n'
-        + f'- {translator("Panel")} : {panel_cmds}'
+        + f'- {translator("Panel")} : {panel_cmds}\n'
+        + f'- {translator("Error Reports")} : {error_thread.mention}'
     )
-    if error_thread is not None:
-        description += f'\n- {translator("Error Reports")} : {error_thread.mention}'
 
     embed = discord.Embed(
         title=translator('DisManager Panel'),
