@@ -32,6 +32,22 @@ class ProcessManager:
         self._processes = {}
         self.configs    = []
 
+    # --- Internal Behaviour ---
+
+    async def _cleanup_deleted_process(
+        self,
+        process: ManagedProcess | None,
+        target_dir: Path | None,
+    ) -> None:
+        if process is not None:
+            await process.shutdown()
+        if target_dir is not None and target_dir.exists():
+            try:
+                await asyncio.to_thread(shutil.rmtree, target_dir)
+            except OSError:
+                await self._client.report_error(f'DeleteProcess:{target_dir.name}')
+
+
     # --- Internal API ---
 
     def load(self) -> None:
@@ -122,18 +138,3 @@ class ProcessManager:
                 asyncio.gather(*(proc.shutdown() for proc in self._processes.values()), return_exceptions=True),
                 timeout=65.0,
             )
-
-    # --- Internal Behaviour ---
-
-    async def _cleanup_deleted_process(
-        self,
-        process: ManagedProcess | None,
-        target_dir: Path | None,
-    ) -> None:
-        if process is not None:
-            await process.shutdown()
-        if target_dir is not None and target_dir.exists():
-            try:
-                await asyncio.to_thread(shutil.rmtree, target_dir)
-            except OSError:
-                await self._client.report_error(f'DeleteProcess:{target_dir.name}')
