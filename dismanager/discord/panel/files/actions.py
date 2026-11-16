@@ -8,13 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from ..utils import confirmation_request
+from ...utils import confirmation_request
 from .archives import run_unzip_command, run_zip_command
 from .embed import compute_path_size, format_bytes, to_dismanager_path
 from .modals import CreateDirModal, EditFileModal, IndexActionModal, RenameModal, UploadModal
 
 if TYPE_CHECKING:
-    from ..client import DisManagerClient
+    from ...client import DisManagerClient
     from .views import FilesView  # noqa: F401
 
 

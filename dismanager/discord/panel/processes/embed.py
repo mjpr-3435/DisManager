@@ -4,8 +4,8 @@ from collections.abc import Sequence
 
 import discord
 
-from ...core.i18n import Translator
-from ...core.processes import MAX_PROCESSES, ProcessConfig
+from ....core.i18n import Translator
+from ....core.processes import MAX_PROCESSES, ProcessConfig
 
 
 def build_processes_embed(processes: Sequence[ProcessConfig], translator: Translator) -> discord.Embed:

@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from ..files import FilesView
-from ..guide import build_guide_embed
-from ..processes import ProcessesConfigView
 from ..utils import confirmation_request
+from .files import FilesView
+from .guide import build_guide_embed
+from .processes import ProcessesConfigView
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient

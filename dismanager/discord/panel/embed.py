@@ -12,7 +12,7 @@ import psutil
 
 from ...core.i18n import Translator
 from ...core.processes import ManagedProcess
-from ..files.embed import format_bytes
+from .files.embed import format_bytes
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient

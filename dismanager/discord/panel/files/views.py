@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from ...core.paths import BACKUPS_DIR
+from ....core.paths import BACKUPS_DIR
 from .actions import DirectoryActionsSelect, FileActionsSelect
 from .backups import BackupsView
 from .embed import build_files_embed, get_max_page, list_directory_entries
@@ -13,7 +13,7 @@ from .modals import GoToPathModal
 from .preview import build_file_attachment
 
 if TYPE_CHECKING:
-    from ..client import DisManagerClient
+    from ...client import DisManagerClient
 
 
 class FilesView(discord.ui.View):

@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import discord
 
-from ...core.processes import ProcessConfig, ProcessConfigError, ProcessDeleteRequest, validate_process_data
-from ..utils import confirmation_request
+from ....core.processes import ProcessConfig, ProcessConfigError, ProcessDeleteRequest, validate_process_data
+from ...utils import confirmation_request
 
 if TYPE_CHECKING:
     from .views import ProcessesConfigView

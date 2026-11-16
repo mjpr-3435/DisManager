@@ -5,12 +5,12 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from ...core.processes import MAX_PROCESSES, ProcessConfig
+from ....core.processes import MAX_PROCESSES, ProcessConfig
 from .embed import build_processes_embed
 from .modals import DeleteProcessModal, ProcessFormModal
 
 if TYPE_CHECKING:
-    from ..client import DisManagerClient
+    from ...client import DisManagerClient
 
 
 class ProcessesConfigView(discord.ui.View):

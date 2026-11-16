@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import discord
 
-from ..utils import confirmation_request
+from ...utils import confirmation_request
 from .embed import list_directory_entries, to_dismanager_path
 
 if TYPE_CHECKING:
