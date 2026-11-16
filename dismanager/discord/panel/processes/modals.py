@@ -73,7 +73,7 @@ class ProcessFormModal(discord.ui.Modal):
                 {
                     'start_command': self._start_input.value,
                     'stop_command': self._stop_input.value,
-                    'blacklist': self._blacklist_input.value,
+                    'blacklist': self._blacklist_input.value.splitlines(),
                 },
             )
         except ProcessConfigError as exc:

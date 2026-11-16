@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import shutil
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
@@ -10,11 +11,12 @@ from pathlib import Path
 from typing import Any
 
 from ..bootstrap.paths import DATA_DIR
-from .config import ProcessConfig, ProcessConfigError, validate_process_data
+from .config import ProcessConfig, ProcessConfigError
 
 _PROCESSES_FILE = DATA_DIR / 'processes.json'
 MAX_PROCESSES = 15
 
+_VALID_NAME_RE = re.compile(r'[A-Za-z0-9]+')
 _logger = logging.getLogger(__name__)
 
 
@@ -113,15 +115,45 @@ class ProcessStore:
         if not isinstance(blacklist, list) or not all(isinstance(item, str) for item in blacklist):
             raise ProcessConfigError(f"Process entry #{index + 1} 'blacklist' must be a list of strings.")
 
-        return validate_process_data(
+        return self._validate_process_data(
             name=name,
             start_command=start_command,
             stop_command=stop_command,
             blacklist=blacklist,
         )
 
+    def _validate_process_data(
+        self,
+        *,
+        name: str,
+        start_command: str,
+        stop_command: str,
+        blacklist: Sequence[str],
+    ) -> ProcessConfig:
+        clean_name = name.strip()
+        if not _VALID_NAME_RE.fullmatch(clean_name):
+            raise ProcessConfigError('Process name must contain only letters and numbers.')
+
+        return ProcessConfig(
+            name=clean_name,
+            start_command=start_command.strip(),
+            stop_command=stop_command.strip(),
+            blacklist=self._normalize_blacklist(blacklist),
+        )
+
+    def _normalize_blacklist(self, raw: Sequence[str]) -> tuple[str, ...]:
+        result: list[str] = []
+        seen: set[str] = set()
+        for item in raw:
+            # Trim surrounding whitespace and skip empty or duplicate lines (preserving order).
+            cleaned = item.strip()
+            if cleaned and cleaned not in seen:
+                seen.add(cleaned)
+                result.append(cleaned)
+        return tuple(result)
+
     def _build_config(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
-        return validate_process_data(
+        return self._validate_process_data(
             name=target,
             start_command=payload['start_command'],
             stop_command=payload['stop_command'],
