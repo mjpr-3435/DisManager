@@ -69,6 +69,11 @@ class DisManagerClient(commands.Bot):
     # --- Public API ---
     
     @property
+    def config(self) -> DisManagerConfig:
+        """Return the active DisManager configuration."""
+        return self._config
+
+    @property
     def processes(self) -> tuple[ManagedProcess, ...]:
         """Return a read-only snapshot of all managed processes."""
         return tuple(self._processes_manager.list_processes())
