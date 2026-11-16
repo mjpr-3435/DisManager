@@ -5,6 +5,7 @@ import contextlib
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import threading
 from pathlib import Path
@@ -37,6 +38,7 @@ class ManagedProcess:
         self._stop_requested = False
         self._reader_thread: threading.Thread | None = None
         self._plugins = PluginManager(self, client)
+        config.resolve_path().mkdir(parents=True, exist_ok=True)
         process_backups_dir(config.name).mkdir(parents=True, exist_ok=True)
         self._plugins.plugins_dir.mkdir(parents=True, exist_ok=True)
         asyncio.create_task(self.ensure_console_thread())
@@ -58,6 +60,15 @@ class ManagedProcess:
     def update_config(self, config: ProcessConfig) -> None:
         """Update process configuration in-place."""
         self._config = config
+
+    async def delete_folder(self) -> None:
+        """Safely delete the process working directory if it resides under the workspace root."""
+        root = Path.cwd().resolve()
+        candidate_dir = self._config.resolve_path().resolve()
+        if candidate_dir == root or not candidate_dir.is_relative_to(root):
+            return
+        if candidate_dir.exists():
+            await asyncio.to_thread(shutil.rmtree, candidate_dir)
 
     def is_running(self) -> bool:
         """Return ``True`` while the subprocess is alive or its Discord relay is still draining."""

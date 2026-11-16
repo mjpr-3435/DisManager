@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import re
-import shutil
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict
-from pathlib import Path
 from typing import Any
 
 from ..bootstrap.paths import DATA_DIR
@@ -193,11 +190,6 @@ class ProcessStore:
 
         updated = [*self._configs, config]
         self._save_to_disk(updated)
-        try:
-            config.resolve_path().mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            raise ProcessConfigError(f"Could not create process folder '{config.name}': {exc}") from exc
-
         self._configs = updated
         return config
 
@@ -226,12 +218,3 @@ class ProcessStore:
         self._save_to_disk(updated)
         self._configs = updated
         return removed
-
-    async def delete_folder(self, name: str) -> None:
-        """Safely delete the process working directory if it resides under the workspace root."""
-        root = Path.cwd().resolve()
-        candidate_dir = (root / name).resolve()
-        if candidate_dir == root or not candidate_dir.is_relative_to(root):
-            return
-        if candidate_dir.exists():
-            await asyncio.to_thread(shutil.rmtree, candidate_dir)

@@ -44,7 +44,7 @@ class ProcessManager:
         await process.shutdown()
         if delete_files:
             try:
-                await self._store.delete_folder(process.name)
+                await process.delete_folder()
             except OSError:
                 await self._client.report_error(f'DeleteProcess:{process.name}')
 
