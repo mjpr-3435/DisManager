@@ -49,6 +49,8 @@ class PluginManager:
 
         candidates = discover_extension_candidates(root)
         if not candidates:
+            if reload:
+                self._process.add_log(_('No plugins to import.'))
             return 0
 
         for plugin_name, module_path in candidates:
@@ -60,7 +62,9 @@ class PluginManager:
                     'plugin',
                     self._process,
                 )
+                self._process.add_log(_('Loaded plugin: {}').format(plugin_name))
             except Exception:
+                self._process.add_log(_('Failed to load plugin: {} (see Error Reports).').format(plugin_name))
                 await self._client.report_error(f'PluginImport:{self._process.name}:{plugin_name}')
 
         await self.call_plugins('on_plugins_load')
