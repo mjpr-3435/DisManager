@@ -34,14 +34,6 @@ class ProcessConfig:
         return Path.cwd().resolve() / self.name
 
 
-@dataclass(frozen=True, slots=True)
-class ProcessDeleteRequest:
-    """Payload describing a process deletion and optional folder cleanup."""
-
-    name: str
-    delete_files: bool
-
-
 def validate_process_data(
     name: str,
     start_command: str,

@@ -3,18 +3,19 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import shutil
+from collections.abc import Mapping
 from pathlib import Path
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from ....core.bootstrap.i18n import _
 from ....core.processes import (
     ManagedProcess,
     ProcessConfig,
     ProcessConfigError,
-    ProcessDeleteRequest,
     delete_process,
     load_processes,
     upsert_process,
+    validate_process_data,
 )
 
 if TYPE_CHECKING:
@@ -34,7 +35,17 @@ class ProcessManager:
 
     # --- Internal Behaviour ---
 
-    def _create_process(self, config: ProcessConfig) -> None:
+    @staticmethod
+    def _build_config(target: str, payload: Mapping[str, Any]) -> ProcessConfig:
+        return validate_process_data(
+            name=target,
+            start_command=str(payload.get('start_command', '')),
+            stop_command=str(payload.get('stop_command', '')),
+            blacklist=payload.get('blacklist', ()),
+        )
+
+    def _create_process(self, target: str, payload: Mapping[str, Any]) -> None:
+        config = self._build_config(target, payload)
         self.configs = upsert_process(config, is_edit=False)
         self._processes[config.name.casefold()] = ManagedProcess(config, self._client)
         try:
@@ -42,18 +53,20 @@ class ProcessManager:
         except OSError as exc:
             raise ProcessConfigError(f"Could not create process folder '{config.name}': {exc}") from exc
 
-    def _update_process(self, config: ProcessConfig) -> None:
+    def _update_process(self, target: str, payload: Mapping[str, Any]) -> None:
+        config = self._build_config(target, payload)
         self.configs = upsert_process(config, is_edit=True)
         process = self._processes.get(config.name.casefold())
         if process is not None:
             process.update_config(config)
 
-    def _delete_process(self, request: ProcessDeleteRequest) -> None:
-        target_proc = self.get_config(request.name)
-        self.configs = delete_process(request.name)
-        process = self._processes.pop(request.name.casefold(), None)
+    def _delete_process(self, target: str, payload: Mapping[str, Any]) -> None:
+        delete_files = bool(payload.get('delete_files', False))
+        target_proc = self.get_config(target)
+        self.configs = delete_process(target)
+        process = self._processes.pop(target.strip().casefold(), None)
         target_dir: Path | None = None
-        if request.delete_files and target_proc is not None:
+        if delete_files and target_proc is not None:
             root = Path.cwd().resolve()
             candidate_dir = target_proc.resolve_path().resolve()
             if candidate_dir != root and candidate_dir.is_relative_to(root):
@@ -99,18 +112,16 @@ class ProcessManager:
     def on_edit(
         self,
         event: Literal['new', 'update', 'delete'],
-        payload: ProcessConfig | ProcessDeleteRequest,
+        target: str,
+        payload: Mapping[str, Any],
     ) -> None:
         """Persist process changes, update client state, and handle folder side effects."""
         if event == 'new':
-            assert isinstance(payload, ProcessConfig)
-            self._create_process(payload)
+            self._create_process(target, payload)
         elif event == 'update':
-            assert isinstance(payload, ProcessConfig)
-            self._update_process(payload)
+            self._update_process(target, payload)
         elif event == 'delete':
-            assert isinstance(payload, ProcessDeleteRequest)
-            self._delete_process(payload)
+            self._delete_process(target, payload)
         else:
             raise ValueError(f'Unsupported process edit event: {event}')
 

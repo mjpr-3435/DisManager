@@ -6,10 +6,11 @@ from typing import TYPE_CHECKING, Any, Literal
 import discord
 
 from ....core.bootstrap.i18n import _
-from ....core.processes import ProcessConfig, ProcessConfigError, ProcessDeleteRequest, validate_process_data
+from ....core.processes import ProcessConfigError
 from ...utils import confirmation_request
 
 if TYPE_CHECKING:
+    from ....core.processes import ProcessConfig
     from .views import ProcessesConfigView
 
 
@@ -64,15 +65,17 @@ class ProcessFormModal(discord.ui.Modal):
         name = self._existing.name if self._existing is not None else (
             self._name_input.value if self._name_input is not None else ''
         )
+        event: Literal['new', 'update'] = 'update' if self._existing is not None else 'new'
         try:
-            config = validate_process_data(
-                name=name,
-                start_command=self._start_input.value,
-                stop_command=self._stop_input.value,
-                blacklist=self._blacklist_input.value,
+            self._processes_view.bot._processes_manager.on_edit(
+                event,
+                name,
+                {
+                    'start_command': self._start_input.value,
+                    'stop_command': self._stop_input.value,
+                    'blacklist': self._blacklist_input.value,
+                },
             )
-            event: Literal['new', 'update'] = 'update' if self._existing is not None else 'new'
-            self._processes_view.bot._processes_manager.on_edit(event, config)
         except ProcessConfigError as exc:
             await interaction.response.send_message(f'✖ {exc}', ephemeral=True)
             return
@@ -109,7 +112,8 @@ class DeleteProcessModal(discord.ui.Modal):
             try:
                 bot._processes_manager.on_edit(
                     'delete',
-                    ProcessDeleteRequest(target_name, delete_files=delete_files),
+                    target_name,
+                    {'delete_files': delete_files},
                 )
             except ProcessConfigError as exc:
                 await confirm_interaction.response.edit_message(content=f'✖ {exc}', embed=None, view=None)
