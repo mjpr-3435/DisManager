@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
+from ...core.bootstrap.i18n import _
 from ...core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
@@ -66,7 +67,7 @@ class _BotEvents(commands.Cog):
             await process.send_logs()
         elif cmd == 'plreload':
             count = await process.reload_plugins()
-            await message.channel.send(self.bot._('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
+            await message.channel.send(_('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
         else:
             process.execute(message.content)
 

@@ -10,7 +10,7 @@ import discord
 from discord.ext import commands
 
 from ...core.bootstrap.config import DisManagerConfig
-from ...core.bootstrap.i18n import Translator
+from ...core.bootstrap.i18n import _
 from ...core.bootstrap.logs import LogSession
 from ...core.processes import ManagedProcess, ProcessConfig, ProcessDeleteRequest
 from .commands import setup as setup_commands
@@ -28,10 +28,9 @@ class DisManagerClient(commands.Bot):
 
     _error_notice_timestamps: dict[str, float]
 
-    def __init__(self, config: DisManagerConfig, translator: Translator, log_session: LogSession) -> None:
+    def __init__(self, config: DisManagerConfig, log_session: LogSession) -> None:
         super().__init__(command_prefix=config.bot_prefix, intents=discord.Intents.all())
         # Core services
-        self._                       = translator
         self._config                 = config
         self._log_session            = log_session
         self._logger                 = logging.getLogger(__name__)
@@ -65,7 +64,7 @@ class DisManagerClient(commands.Bot):
 
         self._ready_once = True
         self._processes_manager.load()
-        print(self._('Logged in as {}!').format(self.user))
+        print(_('Logged in as {}!').format(self.user))
         await self._addons_manager.load_addons(reload=False)
         self._log_session.mute_console()
 
@@ -108,7 +107,7 @@ class DisManagerClient(commands.Bot):
         self._closing = True
 
         if self._ready_once:
-            print(self._('Closing DisManager...'))
+            print(_('Closing DisManager...'))
 
         self._console_manager.stop()
         await self._processes_manager.shutdown_all()
@@ -137,7 +136,7 @@ class DisManagerClient(commands.Bot):
 
         error_thread = await self._panel_manager.ensure_error_thread()
         if error_thread is not None:
-            notice = self._('Unexpected error. Use `{}log` to inspect the log.').format(
+            notice = _('Unexpected error. Use `{}log` to inspect the log.').format(
                 self._config.bot_prefix
             )
             with contextlib.suppress(Exception):

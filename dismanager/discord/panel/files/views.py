@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
+from ....core.bootstrap.i18n import _
 from ....core.bootstrap.paths import BACKUPS_DIR
 from .actions import DirectoryActionsSelect, FileActionsSelect
 from .backups import BackupsView
@@ -100,7 +101,7 @@ class FilesView(discord.ui.View):
 
         options = self._build_select_options(dirs, files)
         if options:
-            self.add_item(_FileSelect(self.bot._('Select a file'), options))
+            self.add_item(_FileSelect(_('Select a file'), options))
 
         self.add_item(_BackButton(disabled=self.path == self.root, row=2))
         self.add_item(_UpdateButton(row=2))

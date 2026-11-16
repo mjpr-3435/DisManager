@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
+from ...core.bootstrap.i18n import _
 from ...core.console import ProcessAction, build_console_handler, console_loop
 from ...core.processes import ProcessConfigError
 
@@ -20,11 +21,10 @@ class ConsoleManager:
     def start(self) -> None:
         """Start the interactive console task."""
         header = (
-            f"{self._client._('Commands')}: "
+            f"{_('Commands')}: "
             'start, stop, restart, kill, plreload, adreload, status, exit'
         )
         handler = build_console_handler(
-            self._client._,
             self._client.close,
             self._client.reload_addons,
             self._client._processes_manager.reload_plugins,
@@ -42,44 +42,44 @@ class ConsoleManager:
     async def _process_action(self, action: ProcessAction, name: str) -> str:
         target = name.strip()
         if not target:
-            return self._client._('Specify the process. E.g.: {} <name>').format(action)
+            return _('Specify the process. E.g.: {} <name>').format(action)
 
         process = self._client.find_process(target)
         if process is None:
-            return self._client._("Process '{}' not found.").format(target)
+            return _("Process '{}' not found.").format(target)
 
         if action == 'start':
             if process.is_running():
-                return self._client._('[{}]: The process is already running.').format(process.name)
+                return _('[{}]: The process is already running.').format(process.name)
             try:
                 process.start()
             except ProcessConfigError as exc:
                 return f'[{process.name}]: {exc}'
-            return self._client._('[{}]: Initializing process.').format(process.name)
+            return _('[{}]: Initializing process.').format(process.name)
 
         if not process.is_running():
-            return self._client._('[{}]: The process is not running.').format(process.name)
+            return _('[{}]: The process is not running.').format(process.name)
 
         if action == 'stop':
             process.stop()
-            return self._client._('[{}]: Stopping process.').format(process.name)
+            return _('[{}]: Stopping process.').format(process.name)
         if action == 'kill':
             process.kill()
-            return self._client._('[{}]: Killing process.').format(process.name)
+            return _('[{}]: Killing process.').format(process.name)
 
         asyncio.create_task(process.restart())
-        return self._client._('[{}]: Restarting process.').format(process.name)
+        return _('[{}]: Restarting process.').format(process.name)
 
     def _status(self) -> str:
         processes = self._client.processes
         if not processes:
-            return self._client._('No processes configured.')
+            return _('No processes configured.')
 
         lines: list[str] = []
         for proc in processes:
             if proc.is_running():
                 ram_mb = proc.ram_usage_bytes() / (1024 * 1024)
-                lines.append(f'  • {proc.name}: {self._client._("Online")} ({ram_mb:.1f} MB)')
+                lines.append(f'  • {proc.name}: {_("Online")} ({ram_mb:.1f} MB)')
             else:
-                lines.append(f'  • {proc.name}: {self._client._("Offline")}')
+                lines.append(f'  • {proc.name}: {_("Offline")}')
         return '\n'.join(lines)

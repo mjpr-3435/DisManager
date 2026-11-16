@@ -9,14 +9,13 @@ import time
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Literal
 
-from .bootstrap.i18n import Translator
+from .bootstrap.i18n import _
 
 _CommandHandler = Callable[[str], Awaitable[bool]]
 ProcessAction = Literal['start', 'stop', 'restart', 'kill']
 
 
 def build_console_handler(
-    translator: Translator,
     on_exit: Callable[[], Coroutine[Any, Any, None]],
     on_adreload: Callable[[], Coroutine[Any, Any, int]],
     on_plreload: Callable[[str | None], Coroutine[Any, Any, int]],
@@ -36,12 +35,12 @@ def build_console_handler(
 
         if cmd == 'adreload':
             count = await on_adreload()
-            print(translator('Reloaded {} addon(s).').format(count))
+            print(_('Reloaded {} addon(s).').format(count))
             return True
 
         if cmd == 'plreload':
             count = await on_plreload(arg or None)
-            print(translator('Reloaded {} plugin(s).').format(count))
+            print(_('Reloaded {} plugin(s).').format(count))
             return True
 
         if cmd in ('start', 'stop', 'restart', 'kill'):
@@ -61,7 +60,7 @@ def build_console_handler(
             print(on_status())
             return True
 
-        print(translator("Unknown command: '{}'.").format(cmd))
+        print(_("Unknown command: '{}'.").format(cmd))
         return True
 
     return handle

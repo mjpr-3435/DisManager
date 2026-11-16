@@ -11,6 +11,7 @@ import aiohttp
 import discord
 
 from ...discord.utils import get_or_create_thread
+from ..bootstrap.i18n import _
 
 if TYPE_CHECKING:
     from ...discord.client import DisManagerClient
@@ -90,7 +91,7 @@ class ConsoleRelay:
         if thread is None:
             return None
         if not data:
-            return await thread.send(self._client._('The log file is currently empty.'))
+            return await thread.send(_('The log file is currently empty.'))
         file = discord.File(io.BytesIO(data), filename=f'{self.name}.log')
         return await thread.send(file=file)
 

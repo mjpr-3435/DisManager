@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Literal
 import discord
 from discord.ext import commands
 
+from ...core.bootstrap.i18n import _
 from ...core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
@@ -28,7 +29,7 @@ class _BotCommands(commands.Cog):
 
         data = self.bot._log_session.recent_bytes()
         if not data:
-            await ctx.send(self.bot._('The log file is currently empty.'))
+            await ctx.send(_('The log file is currently empty.'))
             return
 
         file = discord.File(io.BytesIO(data), filename=self.bot._log_session.filename)
@@ -58,10 +59,10 @@ class _BotCommands(commands.Cog):
             await ctx.message.delete()
         target = name.strip() or None
         if target is not None and self.bot.find_process(target) is None:
-            await ctx.send(self.bot._('✖ Process `{}` not found.').format(target), delete_after=3)
+            await ctx.send(_('✖ Process `{}` not found.').format(target), delete_after=3)
             return
         count = await self.bot._processes_manager.reload_plugins(target)
-        await ctx.send(self.bot._('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
+        await ctx.send(_('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
 
     @commands.command(name='adreload')
     async def adreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:

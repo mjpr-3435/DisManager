@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
+from ...core.bootstrap.i18n import _
 from ..utils import confirmation_request
 from .files import FilesView
 from .guide import build_guide_embed
@@ -70,7 +71,7 @@ class _RestartButton(discord.ui.Button[PanelView]):
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
             await confirm_interaction.response.edit_message(
-                content=self.bot._('Restarting...'),
+                content=_('Restarting...'),
                 embed=None,
                 view=None,
             )
@@ -78,7 +79,7 @@ class _RestartButton(discord.ui.Button[PanelView]):
             await self.bot.request_restart()
 
         await confirmation_request(
-            self.bot._('Are you sure you want to restart DisManager?'),
+            _('Are you sure you want to restart DisManager?'),
             interaction=interaction,
             on_confirmation=on_confirmation,
         )

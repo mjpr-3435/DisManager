@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 import discord
 import psutil
 
-from ...core.bootstrap.i18n import Translator
+from ...core.bootstrap.i18n import _
 from ...core.processes import ManagedProcess
 from .files.embed import format_bytes
 
@@ -32,7 +32,6 @@ async def update_panel(
     embed = _build_panel_embed(
         metrics,
         client._config.bot_prefix,
-        client._,
         error_thread=error_thread,
         process_snapshots=snapshots,
         threads=channel.threads,
@@ -115,7 +114,6 @@ def _collect_system_metrics() -> _SystemMetrics:
 def _build_panel_embed(
     metrics: _SystemMetrics,
     bot_prefix: str,
-    translator: Translator,
     *,
     error_thread: discord.Thread,
     process_snapshots: Sequence[_ProcessSnapshot],
@@ -129,23 +127,23 @@ def _build_panel_embed(
     console_cmds = ' '.join(f'`{cmd}`' for cmd in console_commands)
     panel_cmds = ' '.join(f'`{bot_prefix}{cmd}`' for cmd in panel_commands)
     description = (
-        translator(
+        _(
             'Here you will find an overview of the server resource usage. '
             'Additionally, DisManager recognizes the following commands in the following instances:\n'
         )
-        + f'- {translator("Console")} : {console_cmds}\n'
-        + f'- {translator("Panel")} : {panel_cmds}\n'
-        + f'- {translator("Error Reports")} : {error_thread.mention}'
+        + f'- {_("Console")} : {console_cmds}\n'
+        + f'- {_("Panel")} : {panel_cmds}\n'
+        + f'- {_("Error Reports")} : {error_thread.mention}'
     )
 
     embed = discord.Embed(
-        title=translator('DisManager Panel'),
+        title=_('DisManager Panel'),
         description=description,
         colour=panel_colour,
     )
     embed.add_field(
         inline=True,
-        name=translator('System Resources'),
+        name=_('System Resources'),
         value=_ansi_block(
             [
                 ('Freq', metrics.cpu_freq),

@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import discord
 
+from ....core.bootstrap.i18n import _
 from ....core.processes import ProcessConfig, ProcessConfigError, ProcessDeleteRequest, validate_process_data
 from ...utils import confirmation_request
 
@@ -16,8 +17,7 @@ class ProcessFormModal(discord.ui.Modal):
     """Modal form to create or edit a persisted process configuration."""
 
     def __init__(self, processes_view: ProcessesConfigView, *, existing: ProcessConfig | None = None) -> None:
-        bot = processes_view.bot
-        title = bot._('New process') if existing is None else f"{bot._('Edit')}: {existing.name}"[:45]
+        title = _('New process') if existing is None else f"{_('Edit')}: {existing.name}"[:45]
         super().__init__(title=title)
         self._processes_view = processes_view
         self._existing = existing
@@ -25,7 +25,7 @@ class ProcessFormModal(discord.ui.Modal):
         self._name_input: discord.ui.TextInput[Any] | None = None
         if existing is None:
             self._name_input = discord.ui.TextInput(
-                label=bot._('Name'),
+                label=_('Name'),
                 style=discord.TextStyle.short,
                 placeholder='app',
                 max_length=64,
@@ -33,7 +33,7 @@ class ProcessFormModal(discord.ui.Modal):
             self.add_item(self._name_input)
 
         self._start_input: discord.ui.TextInput[Any] = discord.ui.TextInput(
-            label=bot._('Start command'),
+            label=_('Start command'),
             style=discord.TextStyle.short,
             placeholder='./start.sh',
             required=False,
@@ -41,7 +41,7 @@ class ProcessFormModal(discord.ui.Modal):
             max_length=512,
         )
         self._stop_input: discord.ui.TextInput[Any] = discord.ui.TextInput(
-            label=bot._('Stop command'),
+            label=_('Stop command'),
             style=discord.TextStyle.short,
             placeholder='stop',
             required=False,
@@ -49,9 +49,9 @@ class ProcessFormModal(discord.ui.Modal):
             max_length=256,
         )
         self._blacklist_input: discord.ui.TextInput[Any] = discord.ui.TextInput(
-            label=bot._('Blacklist'),
+            label=_('Blacklist'),
             style=discord.TextStyle.paragraph,
-            placeholder=bot._('One entry per line'),
+            placeholder=_('One entry per line'),
             required=False,
             default='\n'.join(existing.blacklist) if existing is not None else '',
             max_length=1000,
@@ -90,16 +90,15 @@ class DeleteProcessModal(discord.ui.Modal):
         *,
         source_message: discord.Message | None,
     ) -> None:
-        bot = processes_view.bot
-        super().__init__(title=bot._('Delete a process'))
+        super().__init__(title=_('Delete a process'))
         self._processes_view = processes_view
         self._source_message = source_message
         self._process_select: discord.ui.Select[Any] = discord.ui.Select(
             options=[discord.SelectOption(label=proc.name[:100], value=proc.name) for proc in processes[:25]]
         )
         self._delete_files_checkbox: discord.ui.Checkbox[Any] = discord.ui.Checkbox(default=False)
-        self.add_item(discord.ui.Label(text=bot._('Process'), component=self._process_select))
-        self.add_item(discord.ui.Label(text=bot._('Delete process folder too'), component=self._delete_files_checkbox))
+        self.add_item(discord.ui.Label(text=_('Process'), component=self._process_select))
+        self.add_item(discord.ui.Label(text=_('Delete process folder too'), component=self._delete_files_checkbox))
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
         bot = self._processes_view.bot
@@ -147,7 +146,7 @@ class DeleteProcessModal(discord.ui.Modal):
                 ) -> None:
                     await btn_interaction.response.edit_message(delete_after=0)
 
-            warning = bot._(
+            warning = _(
                 'This will ALSO permanently delete `DisManager/{}` and all its files. Are you sure?'
             ).format(target_name)
             await first_confirm.response.edit_message(
@@ -156,7 +155,7 @@ class DeleteProcessModal(discord.ui.Modal):
             )
 
         await confirmation_request(
-            bot._("Are you sure you want to delete process '{}'?").format(target_name),
+            _("Are you sure you want to delete process '{}'?").format(target_name),
             interaction=interaction,
             on_confirmation=on_first_confirmation,
         )

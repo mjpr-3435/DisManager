@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any, Protocol
 
+from ...core.bootstrap.i18n import _
 from ...core.bootstrap.paths import ADDONS_DIR
 from ...core.extensions import (
     discover_extension_candidates,
@@ -56,7 +57,7 @@ class AddonManager:
             return 0
 
         if not reload:
-            print(self._client._('   • Importing addons:'))
+            print(_('   • Importing addons:'))
 
         for addon_name, module_path in candidates:
             try:
@@ -67,10 +68,10 @@ class AddonManager:
                     self._client,
                 )
                 if not reload:
-                    print(self._client._('     -> Imported {}').format(module_path.name))
+                    print(_('     -> Imported {}').format(module_path.name))
             except Exception:
                 if not reload:
-                    print(self._client._('     -> Unable to import {}').format(module_path.name))
+                    print(_('     -> Unable to import {}').format(module_path.name))
                 await self._client.report_error(f'AddonImport:{addon_name}')
 
         await self.call_addons('on_addons_load')

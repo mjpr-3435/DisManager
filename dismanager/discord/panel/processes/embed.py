@@ -4,15 +4,15 @@ from collections.abc import Sequence
 
 import discord
 
-from ....core.bootstrap.i18n import Translator
+from ....core.bootstrap.i18n import _
 from ....core.processes import MAX_PROCESSES, ProcessConfig
 
 
-def build_processes_embed(processes: Sequence[ProcessConfig], translator: Translator) -> discord.Embed:
+def build_processes_embed(processes: Sequence[ProcessConfig]) -> discord.Embed:
     """Build the Processes configuration embed."""
     embed = discord.Embed(
-        title=f"> **{translator('Processes Configuration')}**",
-        description=translator(
+        title=f"> **{_('Processes Configuration')}**",
+        description=_(
             'Configure the processes managed by DisManager. '
             'Each process automatically uses a folder matching its name inside `DisManager/`.\n\n'
             '• Select a process from the menu to inspect or edit its settings.\n'
@@ -20,5 +20,5 @@ def build_processes_embed(processes: Sequence[ProcessConfig], translator: Transl
         ),
         colour=0x2F3136,
     )
-    embed.set_footer(text=f"{translator('Processes')}: {len(processes)}/{MAX_PROCESSES}")
+    embed.set_footer(text=f"{_('Processes')}: {len(processes)}/{MAX_PROCESSES}")
     return embed

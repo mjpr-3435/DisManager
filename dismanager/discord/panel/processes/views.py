@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
+from ....core.bootstrap.i18n import _
 from ....core.processes import MAX_PROCESSES, ProcessConfig
 from .embed import build_processes_embed
 from .modals import DeleteProcessModal, ProcessFormModal
@@ -32,7 +33,7 @@ class ProcessesConfigView(discord.ui.View):
         self.add_item(_NewProcessButton(self.bot, disabled=len(processes) >= MAX_PROCESSES))
         self.add_item(_DeleteProcessButton(self.bot, disabled=not processes))
 
-        return build_processes_embed(processes, self.bot._)
+        return build_processes_embed(processes)
 
     async def refresh(self, interaction: discord.Interaction[Any]) -> None:
         """Re-render the view and update the ephemeral Processes message."""
@@ -57,7 +58,7 @@ class _ProcessSelect(discord.ui.Select[ProcessesConfigView]):
             discord.SelectOption(label=proc.name[:100], value=proc.name)
             for proc in processes[:MAX_PROCESSES]
         ]
-        super().__init__(placeholder=bot._('Select a process'), options=options, row=0)
+        super().__init__(placeholder=_('Select a process'), options=options, row=0)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -71,7 +72,7 @@ class _ProcessSelect(discord.ui.Select[ProcessesConfigView]):
 
 class _NewProcessButton(discord.ui.Button[ProcessesConfigView]):
     def __init__(self, bot: DisManagerClient, *, disabled: bool) -> None:
-        super().__init__(label=bot._('New'), style=discord.ButtonStyle.green, row=1, disabled=disabled)
+        super().__init__(label=_('New'), style=discord.ButtonStyle.green, row=1, disabled=disabled)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -80,7 +81,7 @@ class _NewProcessButton(discord.ui.Button[ProcessesConfigView]):
 
 class _DeleteProcessButton(discord.ui.Button[ProcessesConfigView]):
     def __init__(self, bot: DisManagerClient, *, disabled: bool) -> None:
-        super().__init__(label=bot._('Delete'), style=discord.ButtonStyle.red, row=1, disabled=disabled)
+        super().__init__(label=_('Delete'), style=discord.ButtonStyle.red, row=1, disabled=disabled)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None

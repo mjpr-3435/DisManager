@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 import aiohttp
 import discord
 
+from ...core.bootstrap.i18n import _
 from ..panel import PanelView, update_panel
 from ..utils import get_or_create_thread
 
@@ -43,11 +44,11 @@ class PanelManager:
         channel = self._client.get_channel(panel_id)
 
         if channel is None:
-            print(self._client._('Error: Channel with id {} not found.').format(panel_id))
+            print(_('Error: Channel with id {} not found.').format(panel_id))
             return None
 
         if not isinstance(channel, discord.TextChannel):
-            print(self._client._('Error: The panel channel must be a text channel.'))
+            print(_('Error: The panel channel must be a text channel.'))
             return None
 
         return channel

@@ -6,6 +6,7 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
+from ...core.bootstrap.i18n import _
 from ...core.processes import (
     ManagedProcess,
     ProcessConfig,
@@ -110,7 +111,7 @@ class ProcessManager:
         if not self._processes:
             return
         if any(proc.is_running() for proc in self._processes.values()):
-            print(self._client._('Closing processes...'))
+            print(_('Closing processes...'))
         with contextlib.suppress(TimeoutError):
             await asyncio.wait_for(
                 asyncio.gather(*(proc.shutdown() for proc in self._processes.values()), return_exceptions=True),

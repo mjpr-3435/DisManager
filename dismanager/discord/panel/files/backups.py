@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 import discord
 
 from ....core.backups import BackupEntry, list_backups, process_backups_dir
+from ....core.bootstrap.i18n import _
 from ....core.bootstrap.paths import BACKUPS_DIR
 from ...utils import confirmation_request
 from .embed import format_bytes, to_dismanager_path
@@ -42,16 +43,16 @@ class BackupsView(discord.ui.View):
         title_path = to_dismanager_path(backups_dir, self.files_view.root)
 
         if not self.entries:
-            description = f'*{self.bot._("No backups found.")}*'
+            description = f'*{_("No backups found.")}*'
         else:
             lines: list[str] = []
             for entry in self.entries:
                 size_label = format_bytes(entry.size_bytes)
-                date_label = entry.created_at or self.bot._('Unknown')
+                date_label = entry.created_at or _('Unknown')
                 lines.append(
                     f'📦 **{entry.name}**\n'
-                    f'> `{self.bot._("Disk Usage")}:` {size_label}\n'
-                    f'> `{self.bot._("Date")}:` {date_label}'
+                    f'> `{_("Disk Usage")}:` {size_label}\n'
+                    f'> `{_("Date")}:` {date_label}'
                 )
             description = '\n\n'.join(lines)
 
@@ -60,7 +61,7 @@ class BackupsView(discord.ui.View):
             description=description,
             color=0x2B2D31,
         )
-        embed.set_footer(text=self.bot._('Max backups: {}').format(self.bot._config.backups))
+        embed.set_footer(text=_('Max backups: {}').format(self.bot._config.backups))
         return embed
 
     async def refresh(self, interaction: discord.Interaction[Any], *, message_id: int | None = None) -> None:
@@ -91,13 +92,13 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
     def __init__(self, bot: DisManagerClient, entries: list[BackupEntry]) -> None:
         options = [
             discord.SelectOption(
-                label=bot._('➕ [Make Backup]'),
+                label=_('➕ [Make Backup]'),
                 value='__make__',
-                description=bot._('Create a new rotating backup'),
+                description=_('Create a new rotating backup'),
             )
         ]
         for entry in entries[:24]:
-            desc = f'{format_bytes(entry.size_bytes)} • {entry.created_at or bot._("Unknown")}'
+            desc = f'{format_bytes(entry.size_bytes)} • {entry.created_at or _("Unknown")}'
             options.append(
                 discord.SelectOption(
                     label=f'📦 {entry.name}'[:100],
@@ -105,17 +106,16 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
                     description=desc[:100],
                 )
             )
-        super().__init__(placeholder=bot._('Select a backup'), options=options, row=0)
+        super().__init__(placeholder=_('Select a backup'), options=options, row=0)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         view = self.view
-        bot = view.bot
         process = view.process
 
         if process.is_running():
             await interaction.response.send_message(
-                bot._('✖ Process `{}` is running. Stop it before managing backups.').format(process.name),
+                _('✖ Process `{}` is running. Stop it before managing backups.').format(process.name),
                 ephemeral=True,
             )
             return
@@ -124,7 +124,7 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
         source_message_id = interaction.message.id if interaction.message is not None else None
 
         if selected == '__make__':
-            prompt = bot._('Create a new backup for `{}`?').format(process.name)
+            prompt = _('Create a new backup for `{}`?').format(process.name)
             await confirmation_request(
                 prompt,
                 interaction=interaction,
@@ -134,18 +134,18 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
                     parent_message_id=source_message_id,
                     view=view,
                     worker=process.make_backup,
-                    progress_template=bot._('🔄 `[{}]:` [{}/{}] files have been processed...'),
-                    done_message=bot._('✔ Backup for `{}` created successfully.').format(process.name),
+                    progress_template=_('🔄 `[{}]:` [{}/{}] files have been processed...'),
+                    done_message=_('✔ Backup for `{}` created successfully.').format(process.name),
                 ),
             )
             return
 
         entry = next((item for item in view.entries if item.name == selected), None)
         if entry is None:
-            await interaction.response.send_message(bot._('✖ Backup not found.'), ephemeral=True)
+            await interaction.response.send_message(_('✖ Backup not found.'), ephemeral=True)
             return
 
-        prompt = bot._(
+        prompt = _(
             'Restore `{}` into `{}`? Current files in `{}` will be replaced.'
         ).format(entry.name, process.name, process.name)
         await confirmation_request(
@@ -157,8 +157,8 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
                 parent_message_id=source_message_id,
                 view=view,
                 worker=lambda progress: process.restore_backup(entry.path, progress),
-                progress_template=bot._('🔄 `[{}]:` [{}/{}] files have been unpacked...'),
-                done_message=bot._('✔ Backup `{}` restored successfully.').format(entry.name),
+                progress_template=_('🔄 `[{}]:` [{}/{}] files have been unpacked...'),
+                done_message=_('✔ Backup `{}` restored successfully.').format(entry.name),
             ),
         )
 
@@ -205,7 +205,7 @@ async def _run_backup_job(
 
 class _BackButton(discord.ui.Button[BackupsView]):
     def __init__(self, bot: DisManagerClient, *, row: int) -> None:
-        super().__init__(label=bot._('Back'), style=discord.ButtonStyle.secondary, row=row)
+        super().__init__(label=_('Back'), style=discord.ButtonStyle.secondary, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -214,7 +214,7 @@ class _BackButton(discord.ui.Button[BackupsView]):
 
 class _UpdateButton(discord.ui.Button[BackupsView]):
     def __init__(self, bot: DisManagerClient, *, row: int) -> None:
-        super().__init__(label=bot._('Update'), style=discord.ButtonStyle.secondary, row=row)
+        super().__init__(label=_('Update'), style=discord.ButtonStyle.secondary, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -224,7 +224,7 @@ class _UpdateButton(discord.ui.Button[BackupsView]):
 
 class _FilesButton(discord.ui.Button[BackupsView]):
     def __init__(self, bot: DisManagerClient, *, row: int) -> None:
-        super().__init__(label=bot._('Files'), style=discord.ButtonStyle.primary, row=row)
+        super().__init__(label=_('Files'), style=discord.ButtonStyle.primary, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None

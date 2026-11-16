@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 import discord
 
+from ....core.bootstrap.i18n import _
 from ...utils import confirmation_request
 from .embed import list_directory_entries, to_dismanager_path
 
@@ -20,10 +21,10 @@ class GoToPathModal(discord.ui.Modal):
     path_input: discord.ui.TextInput[Any]
 
     def __init__(self, files_view: FilesView) -> None:
-        super().__init__(title=files_view.bot._('Go to path'))
+        super().__init__(title=_('Go to path'))
         self._files_view = files_view
         self.path_input = discord.ui.TextInput(
-            label=files_view.bot._('Path'),
+            label=_('Path'),
             style=discord.TextStyle.short,
             default=to_dismanager_path(files_view.path, files_view.root),
         )
@@ -33,7 +34,7 @@ class GoToPathModal(discord.ui.Modal):
         target = _resolve_dismanager_path(self.path_input.value, self._files_view.root)
         if target is None:
             await interaction.response.send_message(
-                self._files_view.bot._('✖ The path must exist inside `DisManager`. E.g.: `DisManager/logs`.'),
+                _('✖ The path must exist inside `DisManager`. E.g.: `DisManager/logs`.'),
                 ephemeral=True,
             )
             return
@@ -45,30 +46,30 @@ class IndexActionModal(discord.ui.Modal):
     """Modal that opens or deletes an entry on the current page by index."""
 
     def __init__(self, files_view: FilesView, *, mode: Literal['open', 'delete']) -> None:
-        title = files_view.bot._('Open by index') if mode == 'open' else files_view.bot._('Delete by index')
+        title = _('Open by index') if mode == 'open' else _('Delete by index')
         super().__init__(title=title)
         self._files_view = files_view
         self._mode = mode
         self._kind_select: discord.ui.Select[Any] = discord.ui.Select(
             options=[
-                discord.SelectOption(label=files_view.bot._('Directory'), value='dir', default=True),
-                discord.SelectOption(label=files_view.bot._('File'), value='file'),
+                discord.SelectOption(label=_('Directory'), value='dir', default=True),
+                discord.SelectOption(label=_('File'), value='file'),
             ]
         )
         self._index_input: discord.ui.TextInput[Any] = discord.ui.TextInput(
-            label=files_view.bot._('Index'),
+            label=_('Index'),
             style=discord.TextStyle.short,
             placeholder='1 - 99',
             max_length=2,
         )
-        self.add_item(discord.ui.Label(text=files_view.bot._('Type'), component=self._kind_select))
+        self.add_item(discord.ui.Label(text=_('Type'), component=self._kind_select))
         self.add_item(self._index_input)
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
         raw_index = self._index_input.value.strip()
         if not raw_index.isdigit():
             await interaction.response.send_message(
-                self._files_view.bot._('✖ The index must be a number.'),
+                _('✖ The index must be a number.'),
                 ephemeral=True,
             )
             return
@@ -78,7 +79,7 @@ class IndexActionModal(discord.ui.Modal):
             dirs, files = list_directory_entries(self._files_view.path)
         except OSError as exc:
             await interaction.response.send_message(
-                self._files_view.bot._('✖ Could not read directory: {}').format(exc),
+                _('✖ Could not read directory: {}').format(exc),
                 ephemeral=True,
             )
             return
@@ -89,7 +90,7 @@ class IndexActionModal(discord.ui.Modal):
 
         if index < 1 or index > len(entries):
             await interaction.response.send_message(
-                self._files_view.bot._('✖ Index out of range (1-{}).').format(len(entries)),
+                _('✖ Index out of range (1-{}).').format(len(entries)),
                 ephemeral=True,
             )
             return
@@ -114,7 +115,7 @@ class IndexActionModal(discord.ui.Modal):
                     await asyncio.to_thread(resolved.unlink)
             except OSError as exc:
                 await confirm_interaction.response.edit_message(
-                    content=self._files_view.bot._('✖ Could not delete `{}`: {}').format(resolved.name, exc),
+                    content=_('✖ Could not delete `{}`: {}').format(resolved.name, exc),
                     embed=None,
                     view=None,
                 )
@@ -124,7 +125,7 @@ class IndexActionModal(discord.ui.Modal):
             await self._files_view.navigate(interaction, self._files_view.path, page=self._files_view.page)
 
         await confirmation_request(
-            self._files_view.bot._('Are you sure you want to delete `{}`?').format(
+            _('Are you sure you want to delete `{}`?').format(
                 to_dismanager_path(resolved, self._files_view.root)
             ),
             interaction=interaction,
@@ -138,12 +139,12 @@ class CreateDirModal(discord.ui.Modal):
     name_input: discord.ui.TextInput[Any]
 
     def __init__(self, files_view: FilesView) -> None:
-        super().__init__(title=files_view.bot._('Create directory'))
+        super().__init__(title=_('Create directory'))
         self._files_view = files_view
         self.name_input = discord.ui.TextInput(
-            label=files_view.bot._('Directory name'),
+            label=_('Directory name'),
             style=discord.TextStyle.short,
-            placeholder=files_view.bot._('E.g.: backups'),
+            placeholder=_('E.g.: backups'),
             max_length=100,
         )
         self.add_item(self.name_input)
@@ -154,14 +155,14 @@ class CreateDirModal(discord.ui.Modal):
         dest = (target_dir / name).resolve()
         if not _is_valid_entry_name(name) or dest.parent != target_dir:
             await interaction.response.send_message(
-                self._files_view.bot._('✖ Invalid directory name.'),
+                _('✖ Invalid directory name.'),
                 ephemeral=True,
             )
             return
 
         if dest.exists():
             await interaction.response.send_message(
-                self._files_view.bot._('✖ `{}` already exists.').format(name),
+                _('✖ `{}` already exists.').format(name),
                 ephemeral=True,
             )
             return
@@ -170,7 +171,7 @@ class CreateDirModal(discord.ui.Modal):
             dest.mkdir()
         except OSError as exc:
             await interaction.response.send_message(
-                self._files_view.bot._('✖ Could not create directory: {}').format(exc),
+                _('✖ Could not create directory: {}').format(exc),
                 ephemeral=True,
             )
             return
@@ -184,11 +185,11 @@ class RenameModal(discord.ui.Modal):
     name_input: discord.ui.TextInput[Any]
 
     def __init__(self, files_view: FilesView) -> None:
-        title = files_view.bot._('Rename directory') if files_view.path.is_dir() else files_view.bot._('Rename file')
+        title = _('Rename directory') if files_view.path.is_dir() else _('Rename file')
         super().__init__(title=title)
         self._files_view = files_view
         self.name_input = discord.ui.TextInput(
-            label=files_view.bot._('New name'),
+            label=_('New name'),
             style=discord.TextStyle.short,
             default=files_view.path.name,
             max_length=100,
@@ -208,14 +209,14 @@ class RenameModal(discord.ui.Modal):
         dest = (target.parent / new_name).resolve()
         if not _is_valid_entry_name(new_name) or dest.parent != target.parent:
             await interaction.response.send_message(
-                self._files_view.bot._('✖ Invalid name.'),
+                _('✖ Invalid name.'),
                 ephemeral=True,
             )
             return
 
         if dest.exists():
             await interaction.response.send_message(
-                self._files_view.bot._('✖ `{}` already exists.').format(new_name),
+                _('✖ `{}` already exists.').format(new_name),
                 ephemeral=True,
             )
             return
@@ -224,7 +225,7 @@ class RenameModal(discord.ui.Modal):
             target.rename(dest)
         except OSError as exc:
             await interaction.response.send_message(
-                self._files_view.bot._('✖ Could not rename: {}').format(exc),
+                _('✖ Could not rename: {}').format(exc),
                 ephemeral=True,
             )
             return
@@ -236,22 +237,22 @@ class UploadModal(discord.ui.Modal):
     """Modal that uploads up to 10 files into the current directory."""
 
     def __init__(self, files_view: FilesView) -> None:
-        super().__init__(title=files_view.bot._('Upload files'))
+        super().__init__(title=_('Upload files'))
         self._files_view = files_view
         self._overwrite: discord.ui.Checkbox[Any] = discord.ui.Checkbox(default=False)
         self._file_upload: discord.ui.FileUpload[Any] = discord.ui.FileUpload(min_values=1, max_values=10)
 
         self.add_item(
             discord.ui.Label(
-                text=files_view.bot._('Overwrite?'),
-                description=files_view.bot._('Replace existing files with the same name.'),
+                text=_('Overwrite?'),
+                description=_('Replace existing files with the same name.'),
                 component=self._overwrite,
             )
         )
         self.add_item(
             discord.ui.Label(
-                text=files_view.bot._('Files'),
-                description=files_view.bot._('Select up to 10 files to upload to the current directory.'),
+                text=_('Files'),
+                description=_('Select up to 10 files to upload to the current directory.'),
                 component=self._file_upload,
             )
         )
@@ -262,7 +263,7 @@ class UploadModal(discord.ui.Modal):
         attachments = self._file_upload.values
         total = len(attachments)
         status_msg = await interaction.followup.send(
-            self._files_view.bot._('Processing files...'),
+            _('Processing files...'),
             ephemeral=True,
             wait=True,
         )
@@ -308,7 +309,7 @@ class UploadModal(discord.ui.Modal):
         skipped: list[str],
         failed: list[str],
     ) -> str:
-        header = f'`[{current}/{total}]` {self._files_view.bot._("Processing files...")}'
+        header = f'`[{current}/{total}]` {_("Processing files...")}'
         summary = self._format_summary(saved, skipped, failed)
         return f'{header}\n{summary}' if summary else header
 
@@ -319,7 +320,7 @@ class UploadModal(discord.ui.Modal):
             ('✖ Failed:', failed),
         )
         sections = [
-            f'{self._files_view.bot._(label)}\n' + '\n'.join(f'- `{name}`' for name in names)
+            f'{_(label)}\n' + '\n'.join(f'- `{name}`' for name in names)
             for label, names in groups
             if names
         ]
@@ -332,11 +333,11 @@ class EditFileModal(discord.ui.Modal):
     content_input: discord.ui.TextInput[Any]
 
     def __init__(self, files_view: FilesView, target: Path, content: str) -> None:
-        super().__init__(title=files_view.bot._('Edit file'))
+        super().__init__(title=_('Edit file'))
         self._files_view = files_view
         self._target = target
         self.content_input = discord.ui.TextInput(
-            label=files_view.bot._('Content'),
+            label=_('Content'),
             style=discord.TextStyle.paragraph,
             default=content,
             required=False,
@@ -349,13 +350,13 @@ class EditFileModal(discord.ui.Modal):
             self._target.write_text(self.content_input.value, encoding='utf-8')
         except OSError as exc:
             await interaction.response.send_message(
-                self._files_view.bot._('✖ Could not save file: {}').format(exc),
+                _('✖ Could not save file: {}').format(exc),
                 ephemeral=True,
             )
             return
 
         await interaction.response.send_message(
-            self._files_view.bot._('✔ Saved `{}`.').format(self._target.name),
+            _('✔ Saved `{}`.').format(self._target.name),
             ephemeral=True,
         )
 
