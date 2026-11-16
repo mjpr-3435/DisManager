@@ -20,105 +20,38 @@ _RELAY_QUEUE_MAXSIZE = 1000
 _RELAY_MESSAGE_LIMIT = 1990
 
 
-class ConsoleRelay:
-    """Async Discord thread relay with bounded queue, batching, and omission notices."""
+class ConsoleThreadManager:
+    """Manages a process's Discord console thread, log relay, direct messages, and log uploads."""
+
+    _queue       : asyncio.Queue[str | None]
+    _task        : asyncio.Task[None] | None
+    _thread      : discord.Thread | None
+    _stop_reason : str | None
 
     def __init__(self, process: ManagedProcess) -> None:
-        self._process = process
-        self.name = process.name
-        self._client = process.client
-        self._queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_RELAY_QUEUE_MAXSIZE)
+        self._process      = process
+        self._client       = process.client
+        self._queue        = asyncio.Queue(maxsize=_RELAY_QUEUE_MAXSIZE)
         self._omitted_logs = 0
-        self._task: asyncio.Task[None] | None = None
-        self._thread: discord.Thread | None = None
-        self._stop_reason: str | None = None
-        self._finished = False
+        self._task         = None
+        self._thread       = None
+        self._stop_reason  = None
+        self._finished     = False
         with contextlib.suppress(RuntimeError):
-            asyncio.get_running_loop().create_task(self.ensure_thread())
+            asyncio.get_running_loop().create_task(self._ensure_thread())
 
-    @property
-    def thread(self) -> discord.Thread | None:
-        return self._thread
+    # --- Internal Behaviour ---
 
-    @property
-    def is_active(self) -> bool:
-        return self._task is not None and not self._task.done()
-
-    def start(self) -> None:
-        """Start the background relay task if it is not already running."""
-        if self.is_active and not self._finished:
-            return
-        self._queue = asyncio.Queue(maxsize=_RELAY_QUEUE_MAXSIZE)
-        self._omitted_logs = 0
-        self._stop_reason = None
-        self._finished = False
-        queue = self._queue
-        self._task = asyncio.create_task(self._run(queue), name=f'console-relay-{self.name}')
-
-    def enqueue(self, line: str) -> None:
-        """Push a log line into the bounded relay queue, skipping blacklisted lines."""
-        if self._finished:
-            return
-        if any(term in line for term in self._process._config.blacklist):
-            return
-
-        try:
-            self._queue.put_nowait(line)
-        except asyncio.QueueFull:
-            with contextlib.suppress(asyncio.QueueEmpty):
-                dropped = self._queue.get_nowait()
-                if dropped is None:
-                    return
-                self._omitted_logs += 1
-            with contextlib.suppress(asyncio.QueueFull):
-                self._queue.put_nowait(line)
-
-    def finish(self, *, reason: str | None = None) -> None:
-        """Signal the relay to drain remaining queued lines and stop."""
-        if self._finished:
-            return
-        self._finished = True
-        self._stop_reason = reason
-        try:
-            self._queue.put_nowait(None)
-        except asyncio.QueueFull:
-            with contextlib.suppress(asyncio.QueueEmpty):
-                self._queue.get_nowait()
-                self._omitted_logs += 1
-            with contextlib.suppress(asyncio.QueueFull):
-                self._queue.put_nowait(None)
-
-    async def shutdown(self) -> None:
-        """Stop the relay task cleanly."""
-        self.finish()
-        if self._task is not None and not self._task.done():
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._task
-
-    async def send_log_file(self, data: bytes) -> discord.Message | None:
-        """Send the process's recent 8 MB log buffer as a ``.log`` attachment."""
-        thread = await self.ensure_thread()
-        if thread is None:
-            return None
-        if not data:
-            return await thread.send(_('The log file is currently empty.'))
-        file = discord.File(io.BytesIO(data), filename=f'{self.name}.log')
-        return await thread.send(file=file)
-
-    async def ensure_thread(self) -> discord.Thread | None:
+    async def _ensure_thread(self) -> discord.Thread | None:
         """Ensure the ``Console <name>`` thread exists under the panel channel."""
         panel = self._client._panel_manager.channel
         if panel is None:
             return None
-        self._thread = await get_or_create_thread(panel, f'Console {self.name}')
+        self._thread = await get_or_create_thread(panel, f'Console {self._process.name}')
         return self._thread
 
-    # =========================================
-    #            Internal Helpers
-    # =========================================
-
     async def _run(self, queue: asyncio.Queue[str | None]) -> None:
-        thread = await self.ensure_thread()
+        thread = await self._ensure_thread()
         if thread is None:
             return
 
@@ -150,13 +83,13 @@ class ConsoleRelay:
             except (aiohttp.ClientError, discord.HTTPException):
                 await asyncio.sleep(1.0)
                 with contextlib.suppress(Exception):
-                    refetched = await self.ensure_thread()
+                    refetched = await self._ensure_thread()
                     if refetched is not None:
                         thread = refetched
             except asyncio.CancelledError:
                 raise
             except Exception:
-                await self._client.report_error(f'ConsoleRelay:{self.name}')
+                await self._client.report_error(f'ConsoleThreadManager:{self._process.name}')
                 await asyncio.sleep(1.0)
 
         with contextlib.suppress(aiohttp.ClientError, discord.HTTPException):
@@ -217,3 +150,83 @@ class ConsoleRelay:
         sanitized = log.replace('_', '⎽').replace('*', ' ').replace('`', '’').strip()
         if sanitized:
             pending_chunks.append(sanitized)
+
+    # --- Internal API ---
+
+    @property
+    def thread(self) -> discord.Thread | None:
+        """Return the resolved Discord console thread, if available."""
+        return self._thread
+
+    @property
+    def is_active(self) -> bool:
+        """Return ``True`` while the background relay task is running."""
+        return self._task is not None and not self._task.done()
+
+    def start(self) -> None:
+        """Start the background relay task if it is not already running."""
+        if self.is_active and not self._finished:
+            return
+        self._queue = asyncio.Queue(maxsize=_RELAY_QUEUE_MAXSIZE)
+        self._omitted_logs = 0
+        self._stop_reason = None
+        self._finished = False
+        queue = self._queue
+        self._task = asyncio.create_task(self._run(queue), name=f'console-relay-{self._process.name}')
+
+    def enqueue(self, line: str) -> None:
+        """Push a log line into the bounded relay queue, skipping blacklisted lines."""
+        if self._finished:
+            return
+        if any(term in line for term in self._process._config.blacklist):
+            return
+
+        try:
+            self._queue.put_nowait(line)
+        except asyncio.QueueFull:
+            with contextlib.suppress(asyncio.QueueEmpty):
+                dropped = self._queue.get_nowait()
+                if dropped is None:
+                    return
+                self._omitted_logs += 1
+            with contextlib.suppress(asyncio.QueueFull):
+                self._queue.put_nowait(line)
+
+    def finish(self, *, reason: str | None = None) -> None:
+        """Signal the relay to drain remaining queued lines and stop."""
+        if self._finished:
+            return
+        self._finished = True
+        self._stop_reason = reason
+        try:
+            self._queue.put_nowait(None)
+        except asyncio.QueueFull:
+            with contextlib.suppress(asyncio.QueueEmpty):
+                self._queue.get_nowait()
+                self._omitted_logs += 1
+            with contextlib.suppress(asyncio.QueueFull):
+                self._queue.put_nowait(None)
+
+    async def shutdown(self) -> None:
+        """Stop the relay task cleanly."""
+        self.finish()
+        if self._task is not None and not self._task.done():
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._task
+
+    async def send_message(self, message: str) -> discord.Message | None:
+        """Send a message directly to the process's Discord console thread."""
+        thread = await self._ensure_thread()
+        if thread is None:
+            return None
+        return await thread.send(message)
+
+    async def send_log_file(self, data: bytes) -> discord.Message | None:
+        """Send the process's recent 8 MB log buffer as a ``.log`` attachment."""
+        thread = await self._ensure_thread()
+        if thread is None:
+            return None
+        if not data:
+            return await thread.send(_('The log file is currently empty.'))
+        file = discord.File(io.BytesIO(data), filename=f'{self._process.name}.log')
+        return await thread.send(file=file)

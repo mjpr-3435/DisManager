@@ -68,7 +68,7 @@ class ProcessRunner:
             self._loop.call_soon_threadsafe(self._on_output_line, cleaned)
 
     def _on_output_line(self, line: str) -> None:
-        self._process_obj._relay.enqueue(line)
+        self._process_obj._console_thread.enqueue(line)
         self._emit_plugin_event('on_process_log', line)
         self._process_obj.client._addons_manager.emit('on_process_log', self._process_obj, line)
 
@@ -78,7 +78,7 @@ class ProcessRunner:
 
     def _on_process_exit(self, reason: str | None, crashed: bool) -> None:
         self._process_obj._logger.close_session()
-        self._process_obj._relay.finish(reason=reason)
+        self._process_obj._console_thread.finish(reason=reason)
         if crashed:
             self._process_obj.client._addons_manager.emit('on_process_crash', self._process_obj)
         try:
@@ -150,12 +150,12 @@ class ProcessRunner:
             popen_kwargs['start_new_session'] = True
 
         self._process_obj._logger.start_session()
-        self._process_obj._relay.start()
+        self._process_obj._console_thread.start()
         try:
             proc = subprocess.Popen(args, **popen_kwargs)
         except OSError as exc:
             self._process_obj._logger.close_session()
-            self._process_obj._relay.finish()
+            self._process_obj._console_thread.finish()
             raise ProcessConfigError(f"Could not start '{config.name}': {exc}") from exc
 
         self._process = proc

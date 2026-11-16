@@ -8,7 +8,14 @@ from typing import TYPE_CHECKING
 
 from ..process_store import ProcessConfig
 from ..utils import dir_size_bytes
-from .managers import BackupEntry, BackupManager, ConsoleRelay, PluginManager, ProcessLogger, ProcessRunner
+from .managers import (
+    BackupEntry,
+    BackupManager,
+    ConsoleThreadManager,
+    PluginManager,
+    ProcessLogger,
+    ProcessRunner,
+)
 
 if TYPE_CHECKING:
     import discord
@@ -24,11 +31,11 @@ class ManagedProcess:
         self._client = client
 
         # Internal managers
-        self._runner    = ProcessRunner(self)
-        self._logger    = ProcessLogger(self)
-        self._relay     = ConsoleRelay(self)
-        self._plugins   = PluginManager(self)
-        self._backups   = BackupManager(self)
+        self._runner            = ProcessRunner(self)
+        self._logger            = ProcessLogger(self)
+        self._console_thread    = ConsoleThreadManager(self)
+        self._plugins           = PluginManager(self)
+        self._backups           = BackupManager(self)
 
         config.resolve_path().mkdir(parents=True, exist_ok=True)
 
@@ -49,7 +56,7 @@ class ManagedProcess:
 
     async def _send_logs(self) -> None:
         """Send this process's recent 8 MB log buffer to its Discord console thread."""
-        await self._relay.send_log_file(self._logger.recent_bytes())
+        await self._console_thread.send_log_file(self._logger.recent_bytes())
 
     async def _shutdown(self) -> None:
         """Stop the subprocess gracefully, force-kill after 60 s, and drain its Discord relay."""
@@ -60,7 +67,7 @@ class ManagedProcess:
                 await asyncio.sleep(0.2)
             if self._runner.is_alive:
                 self.kill()
-        await self._relay.shutdown()
+        await self._console_thread.shutdown()
         await self._plugins.unload_plugins()
 
     # --- Public API ---
@@ -85,7 +92,7 @@ class ManagedProcess:
     @property
     def console_thread(self) -> discord.Thread | None:
         """Return the resolved Discord console thread for this process, if available."""
-        return self._relay.thread
+        return self._console_thread.thread
 
     @property
     def backups_dir(self) -> Path:
@@ -101,7 +108,7 @@ class ManagedProcess:
 
     def is_running(self) -> bool:
         """Return ``True`` while the subprocess is alive or its Discord relay is still draining."""
-        return self._runner.is_alive or self._relay.is_active
+        return self._runner.is_alive or self._console_thread.is_active
 
     def start(self) -> bool:
         """Start the configured subprocess and begin reading its output."""
@@ -126,7 +133,7 @@ class ManagedProcess:
                 if self._runner.is_alive:
                     self.kill()
                     await asyncio.sleep(0.2)
-            await self._relay.shutdown()
+            await self._console_thread.shutdown()
 
         return self.start()
 
@@ -150,7 +157,7 @@ class ManagedProcess:
 
     def add_log(self, log: str) -> None:
         """Enqueue a log line into this process's Discord console relay."""
-        self._relay.enqueue(log)
+        self._console_thread.enqueue(log)
 
     def last_logs(self, *, limit: int = 40) -> list[str]:
         """Return up to the last ``limit`` log lines from the recent 8 MB buffer."""
@@ -158,10 +165,7 @@ class ManagedProcess:
 
     async def send_to_console(self, message: str) -> discord.Message | None:
         """Send a message directly to this process's Discord console thread."""
-        thread = await self._relay.ensure_thread()
-        if thread is None:
-            return None
-        return await thread.send(message)
+        return await self._console_thread.send_message(message)
 
     # Metrics
 
