@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 import discord
 
@@ -71,11 +71,8 @@ class ProcessFormModal(discord.ui.Modal):
                 stop_command=self._stop_input.value,
                 blacklist=self._blacklist_input.value,
             )
-            manager = self._processes_view.bot._processes_manager
-            if self._existing is not None:
-                manager.update(config)
-            else:
-                manager.create(config)
+            event: Literal['new', 'update'] = 'update' if self._existing is not None else 'new'
+            self._processes_view.bot._processes_manager.on_edit(event, config)
         except ProcessConfigError as exc:
             await interaction.response.send_message(f'✖ {exc}', ephemeral=True)
             return
@@ -110,7 +107,10 @@ class DeleteProcessModal(discord.ui.Modal):
 
         async def finalize_delete(confirm_interaction: discord.Interaction[Any]) -> None:
             try:
-                bot._processes_manager.delete(ProcessDeleteRequest(target_name, delete_files=delete_files))
+                bot._processes_manager.on_edit(
+                    'delete',
+                    ProcessDeleteRequest(target_name, delete_files=delete_files),
+                )
             except ProcessConfigError as exc:
                 await confirm_interaction.response.edit_message(content=f'✖ {exc}', embed=None, view=None)
                 return

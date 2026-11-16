@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from ....core.bootstrap.i18n import _
 from ....core.processes import (
@@ -33,6 +33,33 @@ class ProcessManager:
         self.configs    = []
 
     # --- Internal Behaviour ---
+
+    def _create_process(self, config: ProcessConfig) -> None:
+        self.configs = upsert_process(config, is_edit=False)
+        self._processes[config.name.casefold()] = ManagedProcess(config, self._client)
+        try:
+            config.resolve_path().mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise ProcessConfigError(f"Could not create process folder '{config.name}': {exc}") from exc
+
+    def _update_process(self, config: ProcessConfig) -> None:
+        self.configs = upsert_process(config, is_edit=True)
+        process = self._processes.get(config.name.casefold())
+        if process is not None:
+            process.update_config(config)
+
+    def _delete_process(self, request: ProcessDeleteRequest) -> None:
+        target_proc = self.get_config(request.name)
+        self.configs = delete_process(request.name)
+        process = self._processes.pop(request.name.casefold(), None)
+        target_dir: Path | None = None
+        if request.delete_files and target_proc is not None:
+            root = Path.cwd().resolve()
+            candidate_dir = target_proc.resolve_path().resolve()
+            if candidate_dir != root and candidate_dir.is_relative_to(root):
+                target_dir = candidate_dir
+        if process is not None or target_dir is not None:
+            asyncio.create_task(self._cleanup_deleted_process(process, target_dir))
 
     async def _cleanup_deleted_process(
         self,
@@ -69,37 +96,24 @@ class ProcessManager:
             proc.name.casefold(): ManagedProcess(proc, self._client) for proc in self.configs
         }
 
-    def create(self, config: ProcessConfig) -> None:
-        """Persist a new process, instantiate it, create its folder, and refresh the panel."""
-        self.configs = upsert_process(config, is_edit=False)
-        self._processes[config.name.casefold()] = ManagedProcess(config, self._client)
-        try:
-            config.resolve_path().mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            raise ProcessConfigError(f"Could not create process folder '{config.name}': {exc}") from exc
-        self._client._panel_manager.refresh()
+    def on_edit(
+        self,
+        event: Literal['new', 'update', 'delete'],
+        payload: ProcessConfig | ProcessDeleteRequest,
+    ) -> None:
+        """Persist process changes, update client state, and handle folder side effects."""
+        if event == 'new':
+            assert isinstance(payload, ProcessConfig)
+            self._create_process(payload)
+        elif event == 'update':
+            assert isinstance(payload, ProcessConfig)
+            self._update_process(payload)
+        elif event == 'delete':
+            assert isinstance(payload, ProcessDeleteRequest)
+            self._delete_process(payload)
+        else:
+            raise ValueError(f'Unsupported process edit event: {event}')
 
-    def update(self, config: ProcessConfig) -> None:
-        """Persist process updates, apply them in memory, and refresh the panel."""
-        self.configs = upsert_process(config, is_edit=True)
-        process = self._processes.get(config.name.casefold())
-        if process is not None:
-            process.update_config(config)
-        self._client._panel_manager.refresh()
-
-    def delete(self, request: ProcessDeleteRequest) -> None:
-        """Remove a process from config and memory, optionally delete its folder, and refresh the panel."""
-        target_proc = self.get_config(request.name)
-        self.configs = delete_process(request.name)
-        process = self._processes.pop(request.name.casefold(), None)
-        target_dir: Path | None = None
-        if request.delete_files and target_proc is not None:
-            root = Path.cwd().resolve()
-            candidate_dir = target_proc.resolve_path().resolve()
-            if candidate_dir != root and candidate_dir.is_relative_to(root):
-                target_dir = candidate_dir
-        if process is not None or target_dir is not None:
-            asyncio.create_task(self._cleanup_deleted_process(process, target_dir))
         self._client._panel_manager.refresh()
 
     async def shutdown_all(self) -> None:
