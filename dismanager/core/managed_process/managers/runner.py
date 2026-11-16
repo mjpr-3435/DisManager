@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
-import re
 import shlex
 import subprocess
 import threading
@@ -12,15 +11,11 @@ from typing import Any
 
 import psutil
 
-from ...bootstrap.paths import LOGS_DIR
-from ...logs import ByteRingBuffer, SessionLogWriter
 from ...process_store import ProcessConfig, ProcessConfigError
-
-_ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;?]*[a-zA-Z]')
 
 
 class ProcessRunner:
-    """Low-level OS subprocess runner with ANSI stripping, log buffering, and process-tree control."""
+    """Low-level OS subprocess runner with stdout reading and process-tree control."""
 
     def __init__(
         self,
@@ -33,7 +28,6 @@ class ProcessRunner:
         self._on_line = on_line
         self._on_exit = on_exit
         self._process: subprocess.Popen[bytes] | None = None
-        self._log_buffer = ByteRingBuffer()
         self._stop_requested = False
         self._reader_thread: threading.Thread | None = None
 
@@ -42,29 +36,17 @@ class ProcessRunner:
     def _read_output(
         self,
         proc: subprocess.Popen[bytes],
-        session_log: SessionLogWriter,
         loop: asyncio.AbstractEventLoop | None,
     ) -> None:
         stdout = proc.stdout
-        try:
-            if stdout is not None:
-                try:
-                    for raw_line in iter(stdout.readline, b''):
-                        decoded = raw_line.decode('utf-8', errors='replace').rstrip('\r\n')
-                        cleaned = _ANSI_ESCAPE_RE.sub('', decoded)
-                        if not cleaned.strip():
-                            continue
-                        if any(term in cleaned for term in self._config.blacklist):
-                            continue
-                        self._log_buffer.append(cleaned)
-                        session_log.write_line(cleaned)
-                        if loop is not None and not loop.is_closed():
-                            loop.call_soon_threadsafe(self._on_line, cleaned)
-                finally:
-                    with contextlib.suppress(OSError):
-                        stdout.close()
-        finally:
-            session_log.close()
+        if stdout is not None:
+            try:
+                for raw_line in iter(stdout.readline, b''):
+                    decoded = raw_line.decode('utf-8', errors='replace').rstrip('\r\n')
+                    self._on_line(decoded)
+            finally:
+                with contextlib.suppress(OSError):
+                    stdout.close()
 
         returncode = proc.wait()
         stop_requested = self._stop_requested
@@ -88,10 +70,6 @@ class ProcessRunner:
         """Update the active process configuration."""
         self._config = config
 
-    def recent_log_bytes(self) -> bytes:
-        """Return the buffered recent output bytes."""
-        return self._log_buffer.get_bytes()
-
     def start(self) -> asyncio.AbstractEventLoop | None:
         """Spawn the configured subprocess, start output reading, and return the active loop."""
         raw_cmd = self._config.start_command.strip()
@@ -114,7 +92,6 @@ class ProcessRunner:
         cwd = self._config.resolve_path()
         cwd.mkdir(parents=True, exist_ok=True)
 
-        self._log_buffer.clear()
         self._stop_requested = False
 
         popen_kwargs: dict[str, Any] = {
@@ -134,7 +111,6 @@ class ProcessRunner:
             raise ProcessConfigError(f"Could not start '{self._config.name}': {exc}") from exc
 
         self._process = proc
-        session_log = SessionLogWriter(LOGS_DIR / 'processes' / self._config.name)
         try:
             loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
         except RuntimeError:
@@ -142,7 +118,7 @@ class ProcessRunner:
 
         self._reader_thread = threading.Thread(
             target=self._read_output,
-            args=(proc, session_log, loop),
+            args=(proc, loop),
             name=f'process-reader-{self._config.name}',
             daemon=True,
         )

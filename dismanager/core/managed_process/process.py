@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from ..process_store import ProcessConfig
 from ..utils import dir_size_bytes
-from .managers import BackupEntry, BackupManager, ConsoleRelay, PluginManager, ProcessRunner
+from .managers import BackupEntry, BackupManager, ConsoleRelay, PluginManager, ProcessLogger, ProcessRunner
 
 if TYPE_CHECKING:
     import discord
@@ -19,19 +19,28 @@ if TYPE_CHECKING:
 class ManagedProcess:
     """High-level coordinator for a managed process, its runner, relay, plugins, and backups."""
 
+    _loop: asyncio.AbstractEventLoop | None
+
     def __init__(self, config: ProcessConfig, client: DisManagerClient) -> None:
         self._config = config
         self._client = client
 
         # Internal managers
-        self._runner    = ProcessRunner(config, on_line=self._on_output_line, on_exit=self._on_process_exit)
-        self._relay     = ConsoleRelay(config.name, client)
+        self._runner    = ProcessRunner(config, on_line=self._on_raw_line, on_exit=self._on_process_exit)
+        self._logger    = ProcessLogger(config)
+        self._relay     = ConsoleRelay(config, client)
         self._plugins   = PluginManager(self, client)
         self._backups   = BackupManager(config, client.config)
+        self._loop      = None
 
         config.resolve_path().mkdir(parents=True, exist_ok=True)
 
     # --- Internal Behaviour ---
+
+    def _on_raw_line(self, raw_line: str) -> None:
+        cleaned = self._logger.record_line(raw_line)
+        if cleaned is not None and self._loop is not None and not self._loop.is_closed():
+            self._loop.call_soon_threadsafe(self._on_output_line, cleaned)
 
     def _on_output_line(self, line: str) -> None:
         self._relay.enqueue(line)
@@ -39,6 +48,7 @@ class ManagedProcess:
         self._client._addons_manager.emit('on_process_log', self, line)
 
     def _on_process_exit(self, reason: str | None, crashed: bool) -> None:
+        self._logger.close_session()
         self._relay.finish(reason=reason)
         if crashed:
             self._client._addons_manager.emit('on_process_crash', self)
@@ -70,6 +80,8 @@ class ManagedProcess:
         """Update process configuration in-place."""
         self._config = config
         self._runner.update_config(config)
+        self._logger.update_config(config)
+        self._relay.update_config(config)
 
     async def _delete_folder(self) -> None:
         """Safely delete the process working directory if it resides under the workspace root."""
@@ -82,7 +94,7 @@ class ManagedProcess:
 
     async def _send_logs(self) -> None:
         """Send this process's recent 8 MB log buffer to its Discord console thread."""
-        await self._relay.send_log_file(self._runner.recent_log_bytes())
+        await self._relay.send_log_file(self._logger.recent_bytes())
 
     async def _shutdown(self) -> None:
         """Stop the subprocess gracefully, force-kill after 60 s, and drain its Discord relay."""
@@ -141,10 +153,17 @@ class ManagedProcess:
         if self.is_running():
             return False
 
+        self._logger.start_session()
         self._relay.start()
+        try:
+            self._loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._loop = None
+
         try:
             loop = self._runner.start()
         except Exception:
+            self._logger.close_session()
             self._relay.finish()
             raise
 
@@ -215,12 +234,7 @@ class ManagedProcess:
 
     def last_logs(self, *, limit: int = 40) -> list[str]:
         """Return up to the last ``limit`` log lines from the recent 8 MB buffer."""
-        if limit <= 0:
-            return []
-        raw = self._runner.recent_log_bytes()
-        if not raw:
-            return []
-        return raw.decode('utf-8', errors='replace').splitlines()[-limit:]
+        return self._logger.last_lines(limit=limit)
 
     async def send_to_console(self, message: str) -> discord.Message | None:
         """Send a message directly to this process's Discord console thread."""
