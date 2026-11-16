@@ -35,6 +35,7 @@ class ManagedProcess:
     def _on_output_line(self, line: str) -> None:
         self._relay.enqueue(line)
         self._emit_plugin_event('on_process_log', line)
+        self._client._addons_manager.emit('on_process_log', self, line)
 
     def _on_process_exit(self, reason: str | None, crashed: bool) -> None:
         self._relay.finish(reason=reason)

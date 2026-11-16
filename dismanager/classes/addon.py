@@ -37,3 +37,7 @@ class BaseAddon:
     async def on_process_crash(self, process: ManagedProcess) -> object:
         """Called when a managed process exits unexpectedly with a non-zero code."""
         return None
+
+    async def on_process_log(self, process: ManagedProcess, log: str) -> object:
+        """Called for each filtered console output line emitted by ``process``."""
+        return None
