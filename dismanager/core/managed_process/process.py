@@ -19,8 +19,6 @@ if TYPE_CHECKING:
 class ManagedProcess:
     """High-level coordinator for a managed process, its runner, relay, plugins, and backups."""
 
-    _loop: asyncio.AbstractEventLoop | None
-
     def __init__(self, config: ProcessConfig, client: DisManagerClient) -> None:
         self._config = config
         self._client = client
@@ -31,52 +29,8 @@ class ManagedProcess:
         self._relay     = ConsoleRelay(self)
         self._plugins   = PluginManager(self)
         self._backups   = BackupManager(self)
-        self._loop      = None
 
         config.resolve_path().mkdir(parents=True, exist_ok=True)
-
-    # --- Internal Behaviour ---
-
-    def _on_raw_line(self, raw_line: str) -> None:
-        cleaned = self._logger.record_line(raw_line)
-        if cleaned is not None and self._loop is not None and not self._loop.is_closed():
-            self._loop.call_soon_threadsafe(self._on_output_line, cleaned)
-
-    def _on_output_line(self, line: str) -> None:
-        self._relay.enqueue(line)
-        self._emit_plugin_event('on_process_log', line)
-        self._client._addons_manager.emit('on_process_log', self, line)
-
-    def _on_process_stop(self) -> None:
-        self._emit_plugin_event('on_process_stop')
-        self._client._addons_manager.emit('on_process_stop', self)
-
-    def _on_process_exit(self, reason: str | None, crashed: bool) -> None:
-        self._logger.close_session()
-        self._relay.finish(reason=reason)
-        if crashed:
-            self._client._addons_manager.emit('on_process_crash', self)
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        loop.create_task(self._on_finish_plugins(crashed=crashed))
-
-    async def _on_start_plugins(self) -> None:
-        await self._plugins.load_plugins(reload=False)
-        await self._plugins.call_plugins('on_process_start')
-
-    async def _on_finish_plugins(self, *, crashed: bool) -> None:
-        if crashed:
-            await self._plugins.call_plugins('on_process_crash')
-        await self._plugins.unload_plugins()
-
-    def _emit_plugin_event(self, event_name: str, *args: object) -> None:
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        loop.create_task(self._plugins.call_plugins(event_name, *args))
 
     # --- Internal API ---
 
@@ -151,27 +105,7 @@ class ManagedProcess:
 
     def start(self) -> bool:
         """Start the configured subprocess and begin reading its output."""
-        if self.is_running():
-            return False
-
-        self._logger.start_session()
-        self._relay.start()
-        try:
-            self._loop = asyncio.get_running_loop()
-        except RuntimeError:
-            self._loop = None
-
-        try:
-            loop = self._runner.start()
-        except Exception:
-            self._logger.close_session()
-            self._relay.finish()
-            raise
-
-        if loop is not None:
-            loop.create_task(self._on_start_plugins())
-        self._client._addons_manager.emit('on_process_start', self)
-        return True
+        return self._runner.start()
 
     def stop(self) -> bool:
         """Request a graceful stop via ``stop_command``, or fall back to ``kill()``."""
@@ -265,4 +199,3 @@ class ManagedProcess:
         if self.is_running():
             raise RuntimeError(f"Process '{self.name}' is currently running.")
         self._backups.restore(backup.path, on_progress)
-
