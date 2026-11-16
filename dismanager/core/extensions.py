@@ -9,10 +9,10 @@ from typing import Any
 
 
 def ensure_on_sys_path(root: Path) -> None:
-    """Insert ``root`` at the front of ``sys.path`` if not already present."""
+    """Append ``root`` to ``sys.path`` if not already present."""
     root_str = str(root)
     if root_str not in sys.path:
-        sys.path.insert(0, root_str)
+        sys.path.append(root_str)
 
 
 def discover_extension_candidates(root: Path) -> list[tuple[str, Path]]:
@@ -36,6 +36,7 @@ def purge_modules_under(root: Path) -> None:
         mod_file = getattr(module, '__file__', None)
         if not isinstance(mod_file, str):
             continue
+
         try:
             resolved = Path(mod_file).resolve()
         except OSError:
@@ -59,10 +60,10 @@ def load_extension_module(
     sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)
-        factory = getattr(module, factory_attr)
-        if not callable(factory):
-            raise TypeError(f"'{module_name}.{factory_attr}' must be callable.")
-        return factory(target)
+        entry_cls = getattr(module, factory_attr)
+        if not isinstance(entry_cls, type):
+            raise TypeError(f"'{module_name}.{factory_attr}' must be a class.")
+        return entry_cls(target)
     except Exception:
         sys.modules.pop(module_name, None)
         raise
@@ -79,6 +80,7 @@ async def dispatch_hook(
         hook = getattr(extension, hook_name, None)
         if not callable(hook):
             continue
+        
         try:
             result = hook(*args)
             if inspect.isawaitable(result):
@@ -97,6 +99,7 @@ async def unload_extensions(
         unload = getattr(extension, 'unload', None)
         if not callable(unload):
             continue
+
         try:
             result = unload()
             if inspect.isawaitable(result):
