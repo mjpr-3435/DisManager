@@ -27,8 +27,9 @@ class ConsoleManager:
 
     # --- Internal Behaviour ---
 
-    async def _loop(self, *, header: str) -> None:
+    async def _loop(self) -> None:
         """Read console commands asynchronously without blocking the event loop."""
+        header = f"{_('Commands')}: start, stop, restart, kill, plreload, adreload, status, exit"
         loop = asyncio.get_running_loop()
         lines: asyncio.Queue[str | None] = asyncio.Queue()
         stop_event = threading.Event()
@@ -148,16 +149,11 @@ class ConsoleManager:
 
     def start(self) -> None:
         """Start the interactive console task."""
-        header = (
-            f"{_('Commands')}: "
-            'start, stop, restart, kill, plreload, adreload, status, exit'
-        )
-        self._task = asyncio.create_task(self._loop(header=header))
+        self._task = asyncio.create_task(self._loop())
 
     def stop(self) -> None:
         """Cancel the local console task if it is still running."""
-        current = asyncio.current_task()
-        if self._task is not None and self._task is not current and not self._task.done():
+        if self._task is not None and self._task is not asyncio.current_task():
             self._task.cancel()
 
 # =========================================
