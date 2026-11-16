@@ -31,15 +31,19 @@ class ConsoleManager:
         """Read console commands asynchronously without blocking the event loop."""
         header = f"{_('Commands')}: start, stop, restart, kill, plreload, adreload, status, exit"
         loop = asyncio.get_running_loop()
+        # Bridge queue between the blocking stdin thread and the asyncio event loop (None signals EOF).
         lines: asyncio.Queue[str | None] = asyncio.Queue()
         stop_event = threading.Event()
 
         def _reader() -> None:
             try:
                 while not stop_event.is_set():
+                    # Poll stdin with a short timeout so stop_event can interrupt waiting on shutdown.
                     if not _wait_for_stdin(stop_event):
                         break
                     line = sys.stdin.readline()
+                    # asyncio.Queue is not thread-safe; schedule put_nowait onto the event loop thread.
+                    # Empty string '' means EOF (stdin closed), converted to None to stop the consumer.
                     with contextlib.suppress(RuntimeError):
                         loop.call_soon_threadsafe(lines.put_nowait, line or None)
                     if not line:
@@ -47,6 +51,7 @@ class ConsoleManager:
             except (OSError, ValueError):
                 pass
 
+        # Daemon thread ensures stdin reading never blocks process exit if cancelled mid-read.
         threading.Thread(target=_reader, daemon=True, name='console-stdin').start()
 
         try:
@@ -55,6 +60,7 @@ class ConsoleManager:
                 sys.stdout.write('>> ')
                 sys.stdout.flush()
 
+                # Yield control back to the bot/Discord loop until the reader thread pushes a line.
                 line = await lines.get()
                 if line is None:
                     break
@@ -66,6 +72,7 @@ class ConsoleManager:
                 if not await self._handle(command):
                     break
         finally:
+            # Signal the stdin reader thread to stop whether exiting normally or via task cancellation.
             stop_event.set()
 
     async def _handle(self, raw_command: str) -> bool:
