@@ -186,7 +186,7 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
                 parent_interaction=interaction,
                 parent_message_id=source_message_id,
                 view=view,
-                worker=lambda progress: process.restore_backup(entry.path, progress),
+                worker=lambda progress: process.restore_backup(entry, progress),
                 progress_template=_('🔄 `[{}]:` [{}/{}] files have been unpacked...'),
                 done_message=_('✔ Backup `{}` restored successfully.').format(entry.name),
             ),

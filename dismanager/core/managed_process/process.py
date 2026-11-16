@@ -234,9 +234,9 @@ class ManagedProcess:
             raise RuntimeError(f"Process '{self.name}' is currently running.")
         return self._backups.make(self._client.config.backups, progress)
 
-    def restore_backup(self, backup_dir: Path, progress: list[int] | None = None) -> None:
-        """Restore ``backup_dir`` into this process's directory."""
+    def restore_backup(self, backup: BackupEntry, progress: list[int] | None = None) -> None:
+        """Restore ``backup`` into this process's directory."""
         if self.is_running():
             raise RuntimeError(f"Process '{self.name}' is currently running.")
-        self._backups.restore(backup_dir, progress)
+        self._backups.restore(backup.path, progress)
 
