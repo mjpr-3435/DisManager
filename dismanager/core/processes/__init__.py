@@ -1,23 +1,14 @@
 from __future__ import annotations
 
-from .config import (
-    MAX_PROCESSES,
-    ProcessConfig,
-    ProcessConfigError,
-    delete_process,
-    load_processes,
-    upsert_process,
-    validate_process_data,
-)
+from .config import ProcessConfig, ProcessConfigError, validate_process_data
 from .process import ManagedProcess
+from .store import MAX_PROCESSES, ProcessStore
 
 __all__ = [
     'MAX_PROCESSES',
     'ManagedProcess',
     'ProcessConfig',
     'ProcessConfigError',
-    'delete_process',
-    'load_processes',
-    'upsert_process',
+    'ProcessStore',
     'validate_process_data',
 ]
