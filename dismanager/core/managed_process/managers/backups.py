@@ -6,9 +6,14 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from ...bootstrap.paths import BACKUPS_DIR
 from ...utils import dir_size_bytes
+
+if TYPE_CHECKING:
+    from ...bootstrap.config import DisManagerConfig
+    from ...process_store import ProcessConfig
 
 BACKUP_LOG_FILENAME = 'backup_log.txt'
 _LOG_PREFIX = 'Backup created on: '
@@ -27,30 +32,19 @@ class BackupEntry:
 class BackupManager:
     """Manages rotating backups under ``.backups/<process_name>``."""
 
-    def __init__(self, process_name: str, source_dir: Path) -> None:
-        self._process_name = process_name
-        self._source_dir = source_dir
+    def __init__(self, config: ProcessConfig, app_config: DisManagerConfig) -> None:
+        self._config = config
+        self._app_config = app_config
         self.backups_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def backups_dir(self) -> Path:
         """Return the resolved ``.backups/<process_name>`` directory."""
-        return (BACKUPS_DIR / self._process_name).resolve()
+        return (BACKUPS_DIR / self._config.name).resolve()
 
     def list_backups(self) -> list[BackupEntry]:
-        """Return existing numbered backups, ordered 1..N."""
-        root = self.backups_dir
-        indexed: list[tuple[int, Path]] = []
-        prefix = f'{self._process_name} '
-        with contextlib.suppress(OSError):
-            for entry in root.iterdir():
-                if not entry.is_dir() or not entry.name.startswith(prefix):
-                    continue
-                suffix = entry.name.removeprefix(prefix)
-                if suffix.isdigit():
-                    indexed.append((int(suffix), entry))
-
-        indexed.sort(key=lambda item: item[0])
+        """Return existing numbered backups within ``1..max_backups``, ordered 1..N."""
+        indexed = _scan_backups(self.backups_dir, self._config.name, self._app_config.backups)
         return [
             BackupEntry(
                 name=path.name,
@@ -61,9 +55,9 @@ class BackupManager:
             for _, path in indexed
         ]
 
-    def make(self, max_backups: int, progress: list[int] | None = None) -> Path:
+    def make(self, progress: list[int] | None = None) -> Path:
         """Create a rotating backup ``<process_name> 1`` from the process directory."""
-        resolved_source = self._source_dir.resolve()
+        resolved_source = self._config.resolve_path().resolve()
         if not resolved_source.is_dir():
             raise FileNotFoundError(f"Process directory '{resolved_source}' does not exist.")
 
@@ -75,9 +69,10 @@ class BackupManager:
             progress[0] = 0
             progress[1] = total
 
-        _rotate_backups(backups_root, self._process_name, max_backups)
+        _rotate_backups(backups_root, self._config.name, self._app_config.backups)
 
-        target_dir = backups_root / f'{self._process_name} 1'
+        target_dir = backups_root / f'{self._config.name} 1'
+        _remove_path(target_dir)
         _copy_tree_with_progress(resolved_source, target_dir, progress)
 
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
@@ -95,7 +90,7 @@ class BackupManager:
             progress[0] = 0
             progress[1] = total
 
-        resolved_target = self._source_dir.resolve()
+        resolved_target = self._config.resolve_path().resolve()
         resolved_target.mkdir(parents=True, exist_ok=True)
         _clear_directory_contents(resolved_target)
         _copy_tree_with_progress(resolved_backup, resolved_target, progress, exclude_name=BACKUP_LOG_FILENAME)
@@ -106,21 +101,38 @@ class BackupManager:
 # =========================================
 
 
-def _rotate_backups(backups_root: Path, process_name: str, max_backups: int) -> None:
+def _scan_backups(backups_root: Path, process_name: str, max_backups: int) -> list[tuple[int, Path]]:
     prefix = f'{process_name} '
-    existing: list[tuple[int, Path]] = []
-    for entry in backups_root.iterdir():
-        if not entry.is_dir() or not entry.name.startswith(prefix):
-            continue
-        suffix = entry.name.removeprefix(prefix)
-        if suffix.isdigit():
-            existing.append((int(suffix), entry))
+    indexed: list[tuple[int, Path]] = []
+    with contextlib.suppress(OSError):
+        for entry in backups_root.iterdir():
+            if not entry.is_dir() or not entry.name.startswith(prefix):
+                continue
+            suffix = entry.name.removeprefix(prefix)
+            if not suffix.isdigit():
+                continue
+            idx = int(suffix)
+            if 1 <= idx <= max_backups and (entry / BACKUP_LOG_FILENAME).is_file():
+                indexed.append((idx, entry))
+    indexed.sort(key=lambda item: item[0])
+    return indexed
 
-    for idx, path in sorted(existing, key=lambda item: item[0], reverse=True):
+
+def _remove_path(path: Path) -> None:
+    if path.is_dir() and not path.is_symlink():
+        shutil.rmtree(path)
+    elif path.exists() or path.is_symlink():
+        path.unlink()
+
+
+def _rotate_backups(backups_root: Path, process_name: str, max_backups: int) -> None:
+    for idx, path in reversed(_scan_backups(backups_root, process_name, max_backups)):
         if idx >= max_backups:
-            shutil.rmtree(path)
+            _remove_path(path)
         else:
-            path.rename(backups_root / f'{process_name} {idx + 1}')
+            dest = backups_root / f'{process_name} {idx + 1}'
+            _remove_path(dest)
+            path.rename(dest)
 
 
 def _clear_directory_contents(directory: Path) -> None:

@@ -26,7 +26,7 @@ class ManagedProcess:
         self._runner    = ProcessRunner(config, on_line=self._on_output_line, on_exit=self._on_process_exit)
         self._relay     = ConsoleRelay(config.name, client)
         self._plugins   = PluginManager(self, client)
-        self._backups   = BackupManager(config.name, config.resolve_path())
+        self._backups   = BackupManager(config, client.config)
 
         config.resolve_path().mkdir(parents=True, exist_ok=True)
 
@@ -248,7 +248,7 @@ class ManagedProcess:
         """Create a rotating backup of this process's directory."""
         if not force and self.is_running():
             raise RuntimeError(f"Process '{self.name}' is currently running.")
-        return self._backups.make(self._client.config.backups, progress)
+        return self._backups.make(progress)
 
     def restore_backup(self, backup: BackupEntry, progress: list[int] | None = None) -> None:
         """Restore ``backup`` into this process's directory."""
