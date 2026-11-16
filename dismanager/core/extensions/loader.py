@@ -80,7 +80,7 @@ async def dispatch_hook(
         hook = getattr(extension, hook_name, None)
         if not callable(hook):
             continue
-        
+
         try:
             result = hook(*args)
             if inspect.isawaitable(result):
