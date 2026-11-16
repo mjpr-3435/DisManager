@@ -34,7 +34,6 @@ async def update_panel(
         client._config.bot_prefix,
         error_thread=error_thread,
         process_snapshots=snapshots,
-        threads=channel.threads,
     )
     return await _publish_or_update_panel(channel, client.user.id, embed, view=view)
 
@@ -65,6 +64,7 @@ class _ProcessSnapshot:
     name: str
     running: bool
     ram_text: str
+    console_thread: discord.Thread | None
 
 
 class _TemperatureSensor(Protocol):
@@ -79,6 +79,7 @@ def _collect_panel_data(processes: Sequence[ManagedProcess]) -> tuple[_SystemMet
             name=proc.name,
             running=(running := proc.is_running()),
             ram_text=format_bytes(proc.ram_usage_bytes()) if running else '0.0 B',
+            console_thread=proc.console_thread,
         )
         for proc in processes
     ]
@@ -117,7 +118,6 @@ def _build_panel_embed(
     *,
     error_thread: discord.Thread,
     process_snapshots: Sequence[_ProcessSnapshot],
-    threads: Sequence[discord.Thread],
 ) -> discord.Embed:
     """Build the Discord embed displaying host system metrics."""
     panel_colour = 0x2F3136
@@ -177,11 +177,13 @@ def _build_panel_embed(
             header='Storage',
         ),
     )
-    thread_by_name = {thread.name: thread for thread in threads}
     visible = process_snapshots[:15]
     for idx, snap in enumerate(visible):
-        console_thread = thread_by_name.get(f'Console {snap.name}')
-        field_name = f'> {console_thread.mention}' if console_thread is not None else f'> {snap.name}'
+        field_name = (
+            f'> {snap.console_thread.mention}'
+            if snap.console_thread is not None
+            else f'> {snap.name} ({_("creating thread...")})'
+        )
         embed.add_field(
             inline=True,
             name=field_name,
