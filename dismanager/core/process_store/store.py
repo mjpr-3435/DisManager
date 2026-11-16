@@ -5,6 +5,7 @@ import json
 import logging
 import shutil
 from collections.abc import Mapping, Sequence
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -94,15 +95,7 @@ class ProcessStore:
 
     def _save_to_disk(self, processes: Sequence[ProcessConfig]) -> None:
         """Persist process definitions atomically to disk."""
-        payload = [
-            {
-                'name': proc.name,
-                'start_command': proc.start_command,
-                'stop_command': proc.stop_command,
-                'blacklist': list(proc.blacklist),
-            }
-            for proc in processes
-        ]
+        payload = [asdict(proc) for proc in processes]
 
         try:
             _PROCESSES_FILE.parent.mkdir(parents=True, exist_ok=True)
