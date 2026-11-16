@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import importlib
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from ...core.bootstrap.i18n import _
 from ...core.bootstrap.paths import ADDONS_DIR
@@ -15,21 +15,7 @@ from ...core.extensions import (
 )
 
 if TYPE_CHECKING:
-    from ...core.processes import ManagedProcess
     from .client import DisManagerClient
-
-
-class AddonProtocol(Protocol):
-    """Duck-typed lifecycle and process-event contract for DisManager addons."""
-
-    def unload(self) -> object: ...
-    async def on_addons_load(self) -> object: ...
-    async def on_addons_unload(self) -> object: ...
-    async def on_plugins_load(self, process: ManagedProcess) -> object: ...
-    async def on_plugins_unload(self, process: ManagedProcess) -> object: ...
-    async def on_process_start(self, process: ManagedProcess) -> object: ...
-    async def on_process_stop(self, process: ManagedProcess) -> object: ...
-    async def on_process_crash(self, process: ManagedProcess) -> object: ...
 
 
 class AddonManager:

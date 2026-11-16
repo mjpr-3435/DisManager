@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import re
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any
 
 from ..extensions import (
     discover_extension_candidates,
@@ -19,18 +19,6 @@ if TYPE_CHECKING:
     from .process import ManagedProcess
 
 _NON_IDENT_RE = re.compile(r'[^0-9a-zA-Z_]+')
-
-
-class PluginProtocol(Protocol):
-    """Duck-typed lifecycle and console-event contract for per-process plugins."""
-
-    def unload(self) -> object: ...
-    async def on_plugins_load(self) -> object: ...
-    async def on_plugins_unload(self) -> object: ...
-    async def on_process_start(self) -> object: ...
-    async def on_process_stop(self) -> object: ...
-    async def on_process_crash(self) -> object: ...
-    async def on_process_log(self, log: str) -> object: ...
 
 
 class PluginManager:
