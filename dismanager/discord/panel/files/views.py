@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from ....core.paths import BACKUPS_DIR
+from ....core.bootstrap.paths import BACKUPS_DIR
 from .actions import DirectoryActionsSelect, FileActionsSelect
 from .backups import BackupsView
 from .embed import build_files_embed, get_max_page, list_directory_entries

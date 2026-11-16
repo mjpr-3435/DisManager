@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any
 import discord
 
 from ....core.backups import BackupEntry, list_backups, process_backups_dir
-from ....core.paths import BACKUPS_DIR
+from ....core.bootstrap.paths import BACKUPS_DIR
 from ...utils import confirmation_request
 from .embed import format_bytes, to_dismanager_path
 

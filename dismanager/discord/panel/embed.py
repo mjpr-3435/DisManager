@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Protocol, cast
 import discord
 import psutil
 
-from ...core.i18n import Translator
+from ...core.bootstrap.i18n import Translator
 from ...core.processes import ManagedProcess
 from .files.embed import format_bytes
 

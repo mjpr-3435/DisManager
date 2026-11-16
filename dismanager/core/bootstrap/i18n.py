@@ -7,7 +7,7 @@ from pathlib import Path
 
 Translator = Callable[[str], str]
 
-_LOCALES_DIR = Path(__file__).resolve().parent.parent / 'locales'
+_LOCALES_DIR = Path(__file__).resolve().parent.parent.parent / 'locales'
 _logger = logging.getLogger(__name__)
 
 

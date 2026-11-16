@@ -14,8 +14,8 @@ from typing import TYPE_CHECKING, Any
 import psutil
 
 from ..backups import make_backup, process_backups_dir, restore_backup
-from ..logs import ByteRingBuffer, SessionLogWriter
-from ..paths import LOGS_DIR
+from ..bootstrap.logs import ByteRingBuffer, SessionLogWriter
+from ..bootstrap.paths import LOGS_DIR
 from .config import ProcessConfig, ProcessConfigError
 from .plugins import PluginManager
 from .relay import ConsoleRelay

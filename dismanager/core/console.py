@@ -9,7 +9,7 @@ import time
 from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, Literal
 
-from .i18n import Translator
+from .bootstrap.i18n import Translator
 
 _CommandHandler = Callable[[str], Awaitable[bool]]
 ProcessAction = Literal['start', 'stop', 'restart', 'kill']

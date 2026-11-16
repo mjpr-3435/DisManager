@@ -4,7 +4,7 @@ from collections.abc import Sequence
 
 import discord
 
-from ....core.i18n import Translator
+from ....core.bootstrap.i18n import Translator
 from ....core.processes import MAX_PROCESSES, ProcessConfig
 
 

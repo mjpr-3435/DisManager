@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any, Protocol
 
+from ...core.bootstrap.paths import ADDONS_DIR
 from ...core.extensions import (
     discover_extension_candidates,
     dispatch_hook,
@@ -11,7 +12,6 @@ from ...core.extensions import (
     purge_modules_under,
     unload_extensions,
 )
-from ...core.paths import ADDONS_DIR
 
 if TYPE_CHECKING:
     from ...core.processes import ManagedProcess

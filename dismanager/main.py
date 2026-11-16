@@ -5,10 +5,10 @@ import subprocess
 import sys
 from importlib.metadata import version
 
-from .core.config import ConfigError, load_config
-from .core.i18n import Translator, load_translator
-from .core.logs import LogSession
-from .core.paths import ensure_workspace_dirs
+from .core.bootstrap.config import ConfigError, load_config
+from .core.bootstrap.i18n import Translator, load_translator
+from .core.bootstrap.logs import LogSession
+from .core.bootstrap.paths import ensure_workspace_dirs
 from .discord.client import DisManagerClient
 
 

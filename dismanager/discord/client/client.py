@@ -9,9 +9,9 @@ from typing import Literal
 import discord
 from discord.ext import commands
 
-from ...core.config import DisManagerConfig
-from ...core.i18n import Translator
-from ...core.logs import LogSession
+from ...core.bootstrap.config import DisManagerConfig
+from ...core.bootstrap.i18n import Translator
+from ...core.bootstrap.logs import LogSession
 from ...core.processes import ManagedProcess, ProcessConfig, ProcessDeleteRequest
 from .commands import setup as setup_commands
 from .events import setup as setup_events
