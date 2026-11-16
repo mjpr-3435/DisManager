@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 import os
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -55,7 +56,7 @@ class BackupManager:
             for _, path in indexed
         ]
 
-    def make(self, progress: list[int] | None = None) -> Path:
+    def make(self, on_progress: Callable[[int, int], None] | None = None) -> Path:
         """Create a rotating backup ``<process_name> 1`` from the process directory."""
         resolved_source = self._config.resolve_path().resolve()
         if not resolved_source.is_dir():
@@ -64,36 +65,40 @@ class BackupManager:
         backups_root = self.backups_dir
         backups_root.mkdir(parents=True, exist_ok=True)
 
-        total = _count_files(resolved_source)
-        if progress is not None:
-            progress[0] = 0
-            progress[1] = total
+        total = _count_files(resolved_source) if on_progress is not None else 0
+        if on_progress is not None:
+            on_progress(0, total)
 
         _rotate_backups(backups_root, self._config.name, self._app_config.backups)
 
         target_dir = backups_root / f'{self._config.name} 1'
         _remove_path(target_dir)
-        _copy_tree_with_progress(resolved_source, target_dir, progress)
+        _copy_tree_with_progress(resolved_source, target_dir, on_progress, total=total)
 
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         (target_dir / BACKUP_LOG_FILENAME).write_text(f'{_LOG_PREFIX}{timestamp}\n', encoding='utf-8')
         return target_dir
 
-    def restore(self, backup_dir: Path, progress: list[int] | None = None) -> None:
+    def restore(self, backup_dir: Path, on_progress: Callable[[int, int], None] | None = None) -> None:
         """Clear the process directory contents and restore files from ``backup_dir``."""
         resolved_backup = backup_dir.resolve()
         if not resolved_backup.is_dir():
             raise FileNotFoundError(f"Backup directory '{resolved_backup}' does not exist.")
 
-        total = _count_files(resolved_backup, exclude_name=BACKUP_LOG_FILENAME)
-        if progress is not None:
-            progress[0] = 0
-            progress[1] = total
+        total = _count_files(resolved_backup, exclude_name=BACKUP_LOG_FILENAME) if on_progress is not None else 0
+        if on_progress is not None:
+            on_progress(0, total)
 
         resolved_target = self._config.resolve_path().resolve()
         resolved_target.mkdir(parents=True, exist_ok=True)
         _clear_directory_contents(resolved_target)
-        _copy_tree_with_progress(resolved_backup, resolved_target, progress, exclude_name=BACKUP_LOG_FILENAME)
+        _copy_tree_with_progress(
+            resolved_backup,
+            resolved_target,
+            on_progress,
+            total=total,
+            exclude_name=BACKUP_LOG_FILENAME,
+        )
 
 
 # =========================================
@@ -157,10 +162,12 @@ def _count_files(directory: Path, *, exclude_name: str | None = None) -> int:
 def _copy_tree_with_progress(
     source_dir: Path,
     target_dir: Path,
-    progress: list[int] | None,
+    on_progress: Callable[[int, int], None] | None,
     *,
+    total: int,
     exclude_name: str | None = None,
 ) -> None:
+    copied = 0
     target_dir.mkdir(parents=True, exist_ok=True)
     for root, dirs, files in os.walk(source_dir):
         rel = Path(root).relative_to(source_dir)
@@ -174,8 +181,9 @@ def _copy_tree_with_progress(
             if is_root and exclude_name is not None and filename == exclude_name:
                 continue
             shutil.copy2(Path(root) / filename, dest_root / filename)
-            if progress is not None:
-                progress[0] += 1
+            copied += 1
+            if on_progress is not None:
+                on_progress(copied, total)
 
 
 def _read_backup_timestamp(log_path: Path) -> str:

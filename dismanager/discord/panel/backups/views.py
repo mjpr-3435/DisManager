@@ -198,18 +198,23 @@ async def _run_backup_job(
     parent_interaction: discord.Interaction[Any],
     parent_message_id: int | None,
     view: BackupsView,
-    worker: Callable[[list[int]], Any],
+    worker: Callable[[Callable[[int, int], None]], Any],
     progress_template: str,
     done_message: str,
 ) -> None:
     assert view.process is not None
     process_name = view.process.name
-    progress = [0, 0]
-    task = asyncio.create_task(asyncio.to_thread(worker, progress))
+    latest = (0, 0)
+
+    def on_progress(done: int, total: int) -> None:
+        nonlocal latest
+        latest = (done, total)
+
+    task = asyncio.create_task(asyncio.to_thread(worker, on_progress))
     last_snapshot: tuple[int, int] | None = None
 
     while not task.done():
-        snapshot = (progress[0], progress[1])
+        snapshot = latest
         if snapshot != last_snapshot and snapshot[1] > 0:
             last_snapshot = snapshot
             with contextlib.suppress(discord.HTTPException):

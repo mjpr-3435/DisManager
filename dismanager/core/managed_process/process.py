@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -244,15 +245,24 @@ class ManagedProcess:
         """Return existing numbered backups for this process, ordered 1..N."""
         return self._backups.list_backups()
 
-    def make_backup(self, progress: list[int] | None = None, *, force: bool = False) -> Path:
+    def make_backup(
+        self,
+        on_progress: Callable[[int, int], None] | None = None,
+        *,
+        force: bool = False,
+    ) -> Path:
         """Create a rotating backup of this process's directory."""
         if not force and self.is_running():
             raise RuntimeError(f"Process '{self.name}' is currently running.")
-        return self._backups.make(progress)
+        return self._backups.make(on_progress)
 
-    def restore_backup(self, backup: BackupEntry, progress: list[int] | None = None) -> None:
+    def restore_backup(
+        self,
+        backup: BackupEntry,
+        on_progress: Callable[[int, int], None] | None = None,
+    ) -> None:
         """Restore ``backup`` into this process's directory."""
         if self.is_running():
             raise RuntimeError(f"Process '{self.name}' is currently running.")
-        self._backups.restore(backup.path, progress)
+        self._backups.restore(backup.path, on_progress)
 
