@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import discord
 from discord.ext import commands
 
-from ....core.bootstrap.i18n import _
-from ....core.process_store import ProcessConfigError
+from ....core.commands import ProcessAction, run_process_action
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
@@ -52,22 +50,13 @@ class _BotEvents(commands.Cog):
             return
 
         cmd = message.content.strip().lower()
-        if cmd == 'start':
-            try:
-                process.start()
-            except ProcessConfigError as exc:
-                await message.channel.send(f'✖ {exc}')
-        elif cmd == 'stop':
-            process.stop()
-        elif cmd == 'kill':
-            process.kill()
-        elif cmd == 'restart':
-            asyncio.create_task(process.restart())
+        if cmd in ('start', 'stop', 'kill', 'restart', 'plreload'):
+            action = cast(ProcessAction, cmd)
+            ok, feedback = await run_process_action(self.bot, action, target_name, markdown=True)
+            if not ok:
+                await message.channel.send(f'✖ {feedback}', delete_after=5)
         elif cmd == 'logs':
             await process.send_logs()
-        elif cmd == 'plreload':
-            count = await process.reload_plugins()
-            await message.channel.send(_('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
         else:
             process.execute(message.content)
 

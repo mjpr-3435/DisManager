@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..bootstrap.i18n import _
 from ..extensions import (
     discover_extension_candidates,
     dispatch_hook,
@@ -37,6 +38,7 @@ class PluginManager:
     async def load_plugins(self, *, reload: bool) -> int:
         """Discover and load plugins from ``<process>/.plugins/``, purging stale modules on reload."""
         if reload:
+            self._process._relay.enqueue(_('Reloading DisManager plugins...'))
             await self.unload_plugins()
 
         root = self.plugins_dir
@@ -66,7 +68,12 @@ class PluginManager:
 
         await self.call_plugins('on_plugins_load')
         self._client._addons_manager.emit('on_plugins_load', self._process)
-        return len(self._plugins)
+        count = len(self._plugins)
+        if reload:
+            self._process._relay.enqueue(_('Reloaded {} plugin(s).').format(count))
+        elif count:
+            self._process._relay.enqueue(_('Loaded {} plugin(s).').format(count))
+        return count
 
     async def unload_plugins(self) -> None:
         """Invoke ``on_plugins_unload`` and ``unload()`` on active plugins, then clear them."""

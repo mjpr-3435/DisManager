@@ -1,18 +1,21 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import io
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
 from ....core.bootstrap.i18n import _
-from ....core.process_store import ProcessConfigError
+from ....core.commands import (
+    ProcessAction,
+    reload_addons_command,
+    run_all_processes_action,
+    run_process_action,
+)
 
 if TYPE_CHECKING:
-    from ....core.managed_process import ManagedProcess
     from ..client import DisManagerClient
 
 
@@ -82,13 +85,13 @@ class _BotCommands(commands.Cog):
             return
         with contextlib.suppress(discord.HTTPException):
             await ctx.message.delete()
-        count = await self.bot.reload_addons()
-        await ctx.send(f'✔ Reloaded {count} addon(s).', delete_after=2)
+        _ok, message = await reload_addons_command(self.bot)
+        await ctx.send(f'✔ {message}', delete_after=2)
 
     async def _run_process_command(
         self,
         ctx: commands.Context[DisManagerClient],
-        action: Literal['start', 'stop', 'kill', 'restart', 'plreload'],
+        action: ProcessAction,
         name: str,
     ) -> None:
         if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
@@ -97,28 +100,14 @@ class _BotCommands(commands.Cog):
         with contextlib.suppress(discord.HTTPException):
             await ctx.message.delete()
 
-        target = name.strip()
-        if not target:
-            await ctx.send(
-                _('✖ Specify the process. E.g.: `{}{} <name>` or `{}{}-all`').format(
-                    ctx.prefix, action, ctx.prefix, action
-                ),
-                delete_after=5,
-            )
-            return
-
-        process = self.bot.find_process(target)
-        if process is None:
-            await ctx.send(f'✖ Process `{target}` not found.', delete_after=5)
-            return
-
-        ok, feedback = await self._execute_process_action(process, action)
-        await ctx.send(feedback, delete_after=2 if ok else 5)
+        ok, message = await run_process_action(self.bot, action, name, markdown=True)
+        prefix = '✔' if ok else '✖'
+        await ctx.send(f'{prefix} {message}', delete_after=2 if ok else 5)
 
     async def _run_all_processes_command(
         self,
         ctx: commands.Context[DisManagerClient],
-        action: Literal['start', 'stop', 'kill', 'restart', 'plreload'],
+        action: ProcessAction,
     ) -> None:
         if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
             return
@@ -126,54 +115,10 @@ class _BotCommands(commands.Cog):
         with contextlib.suppress(discord.HTTPException):
             await ctx.message.delete()
 
-        processes = self.bot.processes
-        if not processes:
-            await ctx.send(_('✖ No processes configured.'), delete_after=3)
-            return
-
-        affected = 0
-        for process in processes:
-            ok, feedback = await self._execute_process_action(process, action)
-            if ok:
-                affected += 1
-            elif feedback.startswith('✖ `') and 'ProcessConfigError' not in feedback:
-                continue
-
-        await ctx.send(
-            _('✔ Executed `{}` on {} process(es).').format(action, affected),
-            delete_after=3,
-        )
-
-    async def _execute_process_action(
-        self,
-        process: ManagedProcess,
-        action: Literal['start', 'stop', 'kill', 'restart', 'plreload'],
-    ) -> tuple[bool, str]:
-        if action == 'start':
-            if process.is_running():
-                return False, f'✖ `[{process.name}]`: The process was already open.'
-            try:
-                process.start()
-            except ProcessConfigError as exc:
-                return False, f'✖ `[{process.name}]`: {exc}'
-            return True, f'✔ `[{process.name}]`: Initializing process.'
-
-        if not process.is_running():
-            return False, f'✖ `[{process.name}]`: The process was not open.'
-
-        if action == 'stop':
-            process.stop()
-            return True, f'✔ `[{process.name}]`: Stopping process.'
-        if action == 'kill':
-            process.kill()
-            return True, f'✔ `[{process.name}]`: Killing process.'
-        if action == 'restart':
-            asyncio.create_task(process.restart())
-            return True, f'✔ `[{process.name}]`: Restarting process.'
-        if action == 'plreload':
-            count = await process.reload_plugins()
-            return True, _('✔ `[{}`]: Reloaded {} plugin(s).').format(process.name, count)
-        raise ValueError(f'Unsupported process action: {action}')
+        ok, message = await run_all_processes_action(self.bot, action, markdown=True)
+        if not ok and '\n' not in message:
+            message = f'✖ {message}'
+        await ctx.send(message, delete_after=3 if ok else 5)
 
 
 async def setup(bot: DisManagerClient) -> None:
