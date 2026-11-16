@@ -6,7 +6,7 @@ from pathlib import Path
 
 import discord
 
-from ....core.files import get_sibling_files, list_directory_entries, to_dismanager_path
+from ....core.files import SandboxPaths, get_sibling_files, list_directory_entries
 from ....core.format import format_bytes
 from .preview import populate_file_preview
 
@@ -20,14 +20,14 @@ def get_max_page(dir_count: int, file_count: int) -> int:
 
 def build_files_embed(
     path: Path,
-    root: Path,
+    sandbox: SandboxPaths,
     page: int,
     *,
     size_text: str | None,
 ) -> discord.Embed:
     """Build the Files navigation embed for a directory or single file."""
     embed = discord.Embed(
-        title=f'> **{to_dismanager_path(path, root)}**',
+        title=f'> **{sandbox.to_virtual(path)}**',
         colour=0x2F3136,
     )
 

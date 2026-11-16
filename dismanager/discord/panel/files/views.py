@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import discord
 
 from ....core.bootstrap.i18n import _
-from ....core.files import clamp_to_root, get_sibling_files, list_directory_entries
+from ....core.files import SandboxPaths, get_sibling_files, list_directory_entries
 from .actions import DirectoryActionsSelect, FileActionsSelect
 from .embed import ENTRIES_PER_PAGE, build_files_embed, get_max_page
 from .modals import GoToPathModal
@@ -19,19 +19,26 @@ if TYPE_CHECKING:
 class FilesView(discord.ui.View):
     """Interactive file-navigation view with directory/file bifurcation."""
 
+    bot: DisManagerClient
+    sandbox: SandboxPaths
+    path: Path
+    page: int
+    _max_page: int
+    _select_targets: list[Path]
+
     def __init__(self, bot: DisManagerClient) -> None:
         super().__init__(timeout=None)
         self.bot = bot
-        self.root = Path.cwd().resolve()
-        self.path = self.root
+        self.sandbox = SandboxPaths(Path.cwd())
+        self.path = self.sandbox.root
         self.page = 1
         self._max_page = 1
-        self._select_targets: list[Path] = []
-        self.render(self.root, page=1)
+        self._select_targets = []
+        self.render(self.sandbox.root, page=1)
 
     def render(self, path: Path, *, page: int = 1, size_text: str | None = None) -> discord.Embed:
         """Update view controls for ``path`` (file or directory) and return its embed."""
-        self.path = clamp_to_root(path, self.root)
+        self.path = self.sandbox.clamp(path)
         self.clear_items()
         self._select_targets = []
 
@@ -42,7 +49,7 @@ class FilesView(discord.ui.View):
             self._max_page = 1
             self._build_file_items()
 
-        return build_files_embed(self.path, self.root, self.page, size_text=size_text)
+        return build_files_embed(self.path, self.sandbox, self.page, size_text=size_text)
 
     async def navigate(
         self,
@@ -56,7 +63,7 @@ class FilesView(discord.ui.View):
         if not interaction.response.is_done():
             await interaction.response.defer()
 
-        clamped = clamp_to_root(path, self.root)
+        clamped = self.sandbox.clamp(path)
         embed = self.render(clamped, page=page, size_text=size_text)
         attachment = build_file_attachment(self.path)
         message = interaction.message
@@ -87,7 +94,8 @@ class FilesView(discord.ui.View):
         if options:
             self.add_item(_FileSelect(_('Select a file'), options))
 
-        self.add_item(_BackButton(disabled=self.path == self.root, row=2))
+        is_root = self.sandbox.is_root(self.path)
+        self.add_item(_BackButton(disabled=is_root, row=2))
         self.add_item(_UpdateButton(row=2))
         self.add_item(_PathButton(row=2))
 
@@ -96,7 +104,7 @@ class FilesView(discord.ui.View):
 
     def _build_file_items(self) -> None:
         self.add_item(FileActionsSelect(self.bot, self.path))
-        self.add_item(_BackButton(disabled=self.path == self.root, row=1))
+        self.add_item(_BackButton(disabled=self.sandbox.is_root(self.path), row=1))
         self.add_item(_UpdateButton(row=1))
         self.add_item(_PathButton(row=1))
         self._add_sibling_file_buttons()

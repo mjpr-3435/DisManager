@@ -14,9 +14,6 @@ from ....core.files import (
     delete_entry,
     list_directory_entries,
     rename_entry,
-    resolve_dismanager_path,
-    resolve_upload_path,
-    to_dismanager_path,
     write_text_file,
 )
 from ...utils import confirmation_request
@@ -37,12 +34,12 @@ class GoToPathModal(discord.ui.Modal):
         self.path_input = discord.ui.TextInput(
             label=_('Path'),
             style=discord.TextStyle.short,
-            default=to_dismanager_path(files_view.path, files_view.root),
+            default=files_view.sandbox.to_virtual(files_view.path),
         )
         self.add_item(self.path_input)
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
-        target = resolve_dismanager_path(self.path_input.value, self._files_view.root)
+        target = self._files_view.sandbox.resolve_virtual(self.path_input.value)
         if target is None:
             await interaction.response.send_message(
                 _('✖ The path must exist inside `DisManager`. E.g.: `DisManager/logs`.'),
@@ -114,13 +111,15 @@ class IndexActionModal(discord.ui.Modal):
         await self._confirm_delete_entry(interaction, target)
 
     async def _confirm_delete_entry(self, interaction: discord.Interaction[Any], target: Path) -> None:
-        resolved = target.resolve()
-        if resolved == self._files_view.root or not resolved.is_relative_to(self._files_view.root):
+        sandbox = self._files_view.sandbox
+        if sandbox.is_root(target) or not sandbox.is_within(target):
             return
+
+        resolved = target.resolve()
 
         async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
             try:
-                await asyncio.to_thread(delete_entry, resolved, self._files_view.root)
+                await asyncio.to_thread(delete_entry, sandbox, resolved)
             except FileActionError as exc:
                 await confirm_interaction.response.edit_message(content=str(exc), embed=None, view=None)
                 return
@@ -129,9 +128,7 @@ class IndexActionModal(discord.ui.Modal):
             await self._files_view.navigate(interaction, self._files_view.path, page=self._files_view.page)
 
         await confirmation_request(
-            _('Are you sure you want to delete `{}`?').format(
-                to_dismanager_path(resolved, self._files_view.root)
-            ),
+            _('Are you sure you want to delete `{}`?').format(sandbox.to_virtual(resolved)),
             interaction=interaction,
             on_confirmation=on_confirmation,
         )
@@ -155,7 +152,7 @@ class CreateDirModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
         try:
-            create_directory(self._files_view.path, self._files_view.root, self.name_input.value)
+            create_directory(self._files_view.sandbox, self._files_view.path, self.name_input.value)
         except FileActionError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
@@ -181,12 +178,13 @@ class RenameModal(discord.ui.Modal):
         self.add_item(self.name_input)
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
+        sandbox = self._files_view.sandbox
         target = self._files_view.path.resolve()
-        if target == self._files_view.root or not target.is_relative_to(self._files_view.root):
+        if sandbox.is_root(target) or not sandbox.is_within(target):
             return
 
         try:
-            dest = rename_entry(target, self._files_view.root, self.name_input.value)
+            dest = rename_entry(sandbox, target, self.name_input.value)
         except FileActionError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return
@@ -236,10 +234,9 @@ class UploadModal(discord.ui.Modal):
         failed: list[str] = []
 
         for idx, attachment in enumerate(attachments, start=1):
-            dest = resolve_upload_path(
+            dest = self._files_view.sandbox.resolve_upload(
                 attachment.filename,
                 self._files_view.path,
-                self._files_view.root,
             )
             if dest is None:
                 failed.append(attachment.filename)
@@ -311,7 +308,7 @@ class EditFileModal(discord.ui.Modal):
 
     async def on_submit(self, interaction: discord.Interaction[Any]) -> None:
         try:
-            write_text_file(self._target, self._files_view.root, self.content_input.value)
+            write_text_file(self._files_view.sandbox, self._target, self.content_input.value)
         except FileActionError as exc:
             await interaction.response.send_message(str(exc), ephemeral=True)
             return

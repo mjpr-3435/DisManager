@@ -17,7 +17,6 @@ from ....core.files import (
     path_size_bytes,
     read_file_size,
     read_text_for_edit,
-    to_dismanager_path,
 )
 from ....core.format import format_bytes
 from ...utils import confirmation_request
@@ -102,8 +101,7 @@ class DirectoryActionsSelect(discord.ui.Select['FilesView']):
     async def _open_rename(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         files_view = self.view
-        target = files_view.path.resolve()
-        if target == files_view.root:
+        if files_view.sandbox.is_root(files_view.path):
             await interaction.response.send_message(
                 _('✖ You cannot rename the root `DisManager` directory.'),
                 ephemeral=True,
@@ -114,20 +112,19 @@ class DirectoryActionsSelect(discord.ui.Select['FilesView']):
     async def _confirm_delete(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         files_view = self.view
-        target = files_view.path.resolve()
-        if target == files_view.root:
+        if files_view.sandbox.is_root(files_view.path):
             await interaction.response.send_message(
                 _('✖ You cannot delete the root `DisManager` directory.'),
                 ephemeral=True,
             )
             return
-        await _confirm_delete_entry(files_view, interaction, target)
+        await _confirm_delete_entry(files_view, interaction, files_view.path.resolve())
 
     async def _confirm_zip(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         files_view = self.view
         target = files_view.path.resolve()
-        if not target.is_relative_to(files_view.root):
+        if not files_view.sandbox.is_within(target):
             return
 
         zip_name = f'{target.name}.zip'
@@ -164,7 +161,7 @@ class DirectoryActionsSelect(discord.ui.Select['FilesView']):
             _(
                 'Are you sure you want to compress `{}` into `{}`? '
                 'Any existing file with the same name will be overwritten.'
-            ).format(to_dismanager_path(target, files_view.root), zip_name),
+            ).format(files_view.sandbox.to_virtual(target), zip_name),
             interaction=interaction,
             on_confirmation=on_confirmation,
         )
@@ -248,7 +245,7 @@ class FileActionsSelect(discord.ui.Select['FilesView']):
 
         await interaction.response.defer(ephemeral=True, thinking=True)
         await interaction.followup.send(
-            f'> **{to_dismanager_path(target, self.view.root)}**',
+            f'> **{self.view.sandbox.to_virtual(target)}**',
             file=discord.File(target),
             ephemeral=True,
         )
@@ -297,7 +294,7 @@ class FileActionsSelect(discord.ui.Select['FilesView']):
             _(
                 'Are you sure you want to extract `{}` into `{}`? '
                 'Any existing files with the same name will be overwritten.'
-            ).format(target.name, to_dismanager_path(dest_dir, files_view.root)),
+            ).format(target.name, files_view.sandbox.to_virtual(dest_dir)),
             interaction=interaction,
             on_confirmation=on_confirmation,
         )
@@ -313,12 +310,12 @@ async def _confirm_delete_entry(
     interaction: discord.Interaction[Any],
     target: Path,
 ) -> None:
-    if not target.is_relative_to(files_view.root):
+    if not files_view.sandbox.is_within(target):
         return
 
     async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
         try:
-            await asyncio.to_thread(delete_entry, target, files_view.root)
+            await asyncio.to_thread(delete_entry, files_view.sandbox, target)
         except FileActionError as exc:
             await confirm_interaction.response.edit_message(content=str(exc), embed=None, view=None)
             return
@@ -327,9 +324,7 @@ async def _confirm_delete_entry(
         await files_view.navigate(interaction, target.parent)
 
     await confirmation_request(
-        _('Are you sure you want to delete `{}`?').format(
-            to_dismanager_path(target, files_view.root)
-        ),
+        _('Are you sure you want to delete `{}`?').format(files_view.sandbox.to_virtual(target)),
         interaction=interaction,
         on_confirmation=on_confirmation,
     )

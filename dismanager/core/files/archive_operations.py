@@ -3,10 +3,20 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
+import tarfile
 import tempfile
 import zipfile
 from collections.abc import Awaitable, Callable
 from pathlib import Path
+from typing import Any
+
+TAR_SUFFIXES = ('.tar', '.tar.gz', '.tgz', '.tar.bz2', '.tbz2', '.tar.xz', '.txz')
+
+
+def is_archive_file(path: Path) -> bool:
+    """Return whether ``path`` uses a supported zip or tar archive extension."""
+    suffix = path.suffix.lower()
+    return suffix == '.zip' or path.name.lower().endswith(TAR_SUFFIXES)
 
 
 async def compress_directory(
@@ -21,7 +31,7 @@ async def compress_directory(
     Returns the archiver subprocess exit code.
     """
     zip_name = dest_zip.name
-    total = await asyncio.to_thread(_count_entries, target, exclude=zip_name)
+    total = await asyncio.to_thread(_count_archive_sources, target, exclude=zip_name)
     tmp_dir = Path(tempfile.mkdtemp(prefix='dismanager_zip_'))
     tmp_zip = tmp_dir / zip_name
 
@@ -77,6 +87,55 @@ async def extract_archive(
     )
 
 
+def read_archive_entries(path: Path) -> list[tuple[list[str], bool]]:
+    """Return normalized ``(path_parts, is_dir)`` entries from a ``.zip`` or ``.tar*`` archive."""
+    if path.suffix.lower() == '.zip':
+        with zipfile.ZipFile(path) as zf:
+            return [
+                (parts, info.is_dir())
+                for info in zf.infolist()
+                if (parts := [p for p in info.filename.strip('/').split('/') if p and p != '.'])
+            ]
+
+    with tarfile.open(path, 'r:*') as tf:
+        return [
+            (parts, member.isdir())
+            for member in tf.getmembers()
+            if (parts := [p for p in member.name.strip('/').split('/') if p and p != '.'])
+        ]
+
+
+def build_archive_tree_text(path: Path, *, max_chars: int = 3200) -> str | None:
+    """Render an ASCII tree of entries inside ``path``, or ``None`` if the archive is empty."""
+    entries = read_archive_entries(path)
+    if not entries:
+        return None
+
+    tree: dict[str, Any] = {}
+    for parts, is_dir in entries:
+        _insert_tree_node(tree, parts, is_dir=is_dir)
+
+    lines = [path.name]
+    _render_ascii_tree(tree, prefix='', lines=lines)
+
+    output_lines: list[str] = []
+    char_count = 0
+    truncated_entries = 0
+
+    for idx, line in enumerate(lines):
+        next_len = char_count + len(line) + 1
+        if next_len > max_chars and idx > 1:
+            truncated_entries = len(lines) - idx
+            break
+        output_lines.append(line)
+        char_count = next_len
+
+    if truncated_entries > 0:
+        output_lines.append(f'... (+{truncated_entries} more entries)')
+
+    return '\n'.join(output_lines)
+
+
 # =========================================
 #            Internal Helpers
 # =========================================
@@ -119,7 +178,7 @@ async def _run_archive_command(
     return await wait_task
 
 
-def _count_entries(root: Path, *, exclude: str) -> int:
+def _count_archive_sources(root: Path, *, exclude: str) -> int:
     count = 1
     stack: list[Path] = [root]
     while stack:
@@ -146,3 +205,32 @@ def _count_zip_entries(archive: Path) -> int:
             return len(zf.infolist())
     except (OSError, zipfile.BadZipFile):
         return 0
+
+
+def _insert_tree_node(root: dict[str, Any], parts: list[str], *, is_dir: bool) -> None:
+    node = root
+    for idx, part in enumerate(parts):
+        is_last = idx == len(parts) - 1
+        existing = node.get(part)
+        if is_last and not is_dir:
+            if existing is None:
+                node[part] = None
+            return
+        if not isinstance(existing, dict):
+            existing = {}
+            node[part] = existing
+        node = existing
+
+
+def _render_ascii_tree(node: dict[str, Any], *, prefix: str, lines: list[str]) -> None:
+    items = sorted(node.items(), key=lambda item: (not isinstance(item[1], dict), item[0].lower()))
+    last_idx = len(items) - 1
+    for idx, (name, child) in enumerate(items):
+        is_last = idx == last_idx
+        connector = '`-- ' if is_last else '|-- '
+        if isinstance(child, dict):
+            lines.append(f'{prefix}{connector}{name}/')
+            child_prefix = f'{prefix}{"    " if is_last else "|   "}'
+            _render_ascii_tree(child, prefix=child_prefix, lines=lines)
+        else:
+            lines.append(f'{prefix}{connector}{name}')
