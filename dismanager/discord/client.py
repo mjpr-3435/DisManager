@@ -52,7 +52,7 @@ class DisManagerClient(commands.Bot):
         self.error_thread: discord.Thread | None = None
         self._ready_once = False
         self._closing = False
-        self.should_restart = False
+        self._should_restart = False
         self._panel_task: asyncio.Task[None] | None = None
         self._panel_refresh_event = asyncio.Event()
         self._console_task: asyncio.Task[None] | None = None
@@ -243,9 +243,13 @@ class DisManagerClient(commands.Bot):
         except Exception as exc:
             self._logger.warning('Failed to mark panel offline: %s', exc)
 
+    def restart_requested(self) -> bool:
+        """Return whether the client closed due to a restart request."""
+        return self._should_restart
+
     async def request_restart(self) -> None:
         """Shut down via the unified close flow and signal the runner to relaunch."""
-        self.should_restart = True
+        self._should_restart = True
         await self.close()
 
     async def report_error(self, context: str) -> None:

@@ -32,7 +32,7 @@ def run() -> None:
         print(translate('Error while running discord client: {}').format(exc), file=sys.stderr)
         sys.exit(1)
 
-    if client.should_restart:
+    if client.restart_requested():
         _relaunch()
 
 
