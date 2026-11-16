@@ -33,7 +33,7 @@ class ManagedProcess:
 
     def _on_output_line(self, line: str) -> None:
         self._relay.enqueue(line)
-        self.emit_plugin_event('on_process_log', line)
+        self._emit_plugin_event('on_process_log', line)
 
     def _on_process_exit(self, reason: str | None, crashed: bool) -> None:
         self._relay.finish(reason=reason)
@@ -52,6 +52,42 @@ class ManagedProcess:
     async def _on_finish_plugins(self, *, crashed: bool) -> None:
         if crashed:
             await self._plugins.call_plugins('on_process_crash')
+        await self._plugins.unload_plugins()
+
+    def _emit_plugin_event(self, event_name: str, *args: object) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._plugins.call_plugins(event_name, *args))
+
+    # --- Internal API ---
+
+    def _update_config(self, config: ProcessConfig) -> None:
+        """Update process configuration in-place."""
+        self._config = config
+        self._runner.update_config(config)
+        self._backups.update_source_dir(config.resolve_path())
+
+    async def _delete_folder(self) -> None:
+        """Safely delete the process working directory if it resides under the workspace root."""
+        root = Path.cwd().resolve()
+        candidate_dir = self._config.resolve_path().resolve()
+        if candidate_dir == root or not candidate_dir.is_relative_to(root):
+            return
+        if candidate_dir.exists():
+            await asyncio.to_thread(shutil.rmtree, candidate_dir)
+
+    async def _shutdown(self) -> None:
+        """Stop the subprocess gracefully, force-kill after 60 s, and drain its Discord relay."""
+        if self._runner.is_alive:
+            self.stop()
+            deadline = asyncio.get_running_loop().time() + 60.0
+            while self._runner.is_alive and asyncio.get_running_loop().time() < deadline:
+                await asyncio.sleep(0.2)
+            if self._runner.is_alive:
+                self.kill()
+        await self._relay.shutdown()
         await self._plugins.unload_plugins()
 
     # --- Public API ---
@@ -81,21 +117,6 @@ class ManagedProcess:
         """Return the resolved ``.backups/<name>`` directory for this process."""
         return self._backups.backups_dir
 
-    def update_config(self, config: ProcessConfig) -> None:
-        """Update process configuration in-place."""
-        self._config = config
-        self._runner.update_config(config)
-        self._backups.update_source_dir(config.resolve_path())
-
-    async def delete_folder(self) -> None:
-        """Safely delete the process working directory if it resides under the workspace root."""
-        root = Path.cwd().resolve()
-        candidate_dir = self._config.resolve_path().resolve()
-        if candidate_dir == root or not candidate_dir.is_relative_to(root):
-            return
-        if candidate_dir.exists():
-            await asyncio.to_thread(shutil.rmtree, candidate_dir)
-
     def is_running(self) -> bool:
         """Return ``True`` while the subprocess is alive or its Discord relay is still draining."""
         return self._runner.is_alive or self._relay.is_active
@@ -116,30 +137,6 @@ class ManagedProcess:
             raise RuntimeError(f"Process '{self.name}' is currently running.")
         self._backups.restore(backup_dir, progress)
 
-    def emit_plugin_event(self, event_name: str, *args: object) -> None:
-        """Schedule a plugin event dispatch on the active event loop."""
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        loop.create_task(self._plugins.call_plugins(event_name, *args))
-
-
-    async def send_logs(self) -> None:
-        """Send this process's recent 8 MB log buffer to its Discord console thread."""
-        await self._relay.send_log_file(self._runner.recent_log_bytes())
-
-
-    def execute(self, command: str) -> bool:
-        """Write a command line to the subprocess stdin."""
-        return self._runner.execute(command)
-
-    def ram_usage_bytes(self) -> int:
-        """Return total RSS memory in bytes for the process tree."""
-        return self._runner.ram_usage_bytes()
-
-
-    
     def start(self) -> bool:
         """Start the configured subprocess and begin reading its output."""
         if self.is_running():
@@ -157,6 +154,12 @@ class ManagedProcess:
         self._client._addons_manager.emit('on_process_start', self)
         return True
 
+    async def reload_plugins(self) -> int:
+        """Reload per-process plugins when this process is running."""
+        if not self.is_running():
+            return 0
+        return await self._plugins.load_plugins(reload=True)
+
     def stop(self) -> bool:
         """Request a graceful stop via ``stop_command``, or fall back to ``kill()``."""
         if not self._runner.is_alive:
@@ -166,7 +169,7 @@ class ManagedProcess:
             return self.kill()
 
         if self._runner.mark_stop_requested():
-            self.emit_plugin_event('on_process_stop')
+            self._emit_plugin_event('on_process_stop')
             self._client._addons_manager.emit('on_process_stop', self)
         return self.execute(self._config.stop_command)
 
@@ -176,7 +179,7 @@ class ManagedProcess:
             return False
 
         if self._runner.mark_stop_requested():
-            self.emit_plugin_event('on_process_stop')
+            self._emit_plugin_event('on_process_stop')
             self._client._addons_manager.emit('on_process_stop', self)
         return self._runner.kill_tree()
 
@@ -195,20 +198,14 @@ class ManagedProcess:
 
         return self.start()
 
-    async def reload_plugins(self) -> int:
-        """Reload per-process plugins when this process is running."""
-        if not self.is_running():
-            return 0
-        return await self._plugins.load_plugins(reload=True)
-    
-    async def shutdown(self) -> None:
-        """Stop the subprocess gracefully, force-kill after 60 s, and drain its Discord relay."""
-        if self._runner.is_alive:
-            self.stop()
-            deadline = asyncio.get_running_loop().time() + 60.0
-            while self._runner.is_alive and asyncio.get_running_loop().time() < deadline:
-                await asyncio.sleep(0.2)
-            if self._runner.is_alive:
-                self.kill()
-        await self._relay.shutdown()
-        await self._plugins.unload_plugins()
+    async def send_logs(self) -> None:
+        """Send this process's recent 8 MB log buffer to its Discord console thread."""
+        await self._relay.send_log_file(self._runner.recent_log_bytes())
+
+    def execute(self, command: str) -> bool:
+        """Write a command line to the subprocess stdin."""
+        return self._runner.execute(command)
+
+    def ram_usage_bytes(self) -> int:
+        """Return total RSS memory in bytes for the process tree."""
+        return self._runner.ram_usage_bytes()

@@ -36,7 +36,7 @@ class ProcessManager:
 
     def _update_process(self, target: str, payload: Mapping[str, Any]) -> None:
         config = self._store.update(target, payload)
-        self._processes[config.name.casefold()].update_config(config)
+        self._processes[config.name.casefold()]._update_config(config)
 
     def _delete_process(self, target: str, payload: Mapping[str, Any]) -> None:
         removed = self._store.delete(target)
@@ -49,10 +49,10 @@ class ProcessManager:
 
     async def _cleanup_deleted_process(self, process: ManagedProcess, *, key: str, delete_files: bool) -> None:
         try:
-            await process.shutdown()
+            await process._shutdown()
             if delete_files:
                 try:
-                    await process.delete_folder()
+                    await process._delete_folder()
                 except OSError:
                     await self._client.report_error(f'DeleteProcess:{process.name}')
         finally:
@@ -109,7 +109,7 @@ class ProcessManager:
                 print(_('Closing processes...'))
             with contextlib.suppress(TimeoutError):
                 await asyncio.wait_for(
-                    asyncio.gather(*(proc.shutdown() for proc in self._processes.values()), return_exceptions=True),
+                    asyncio.gather(*(proc._shutdown() for proc in self._processes.values()), return_exceptions=True),
                     timeout=65.0,
                 )
         try:
