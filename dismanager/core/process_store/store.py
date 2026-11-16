@@ -22,26 +22,25 @@ class ProcessStore:
 
     _configs: list[ProcessConfig]
 
-    def __init__(self, store_file: Path = _PROCESSES_FILE) -> None:
-        self._store_file = store_file
+    def __init__(self) -> None:
         self._configs = []
 
     # --- Internal Behaviour ---
 
     def _read_from_disk(self) -> list[ProcessConfig]:
-        if not self._store_file.exists():
+        if not _PROCESSES_FILE.exists():
             return []
 
         try:
-            raw_text = self._store_file.read_text(encoding='utf-8')
+            raw_text = _PROCESSES_FILE.read_text(encoding='utf-8')
             data: object = json.loads(raw_text)
         except (OSError, json.JSONDecodeError) as exc:
-            _logger.warning("Resetting unreadable process store '%s': %s", self._store_file, exc)
+            _logger.warning("Resetting unreadable process store '%s': %s", _PROCESSES_FILE, exc)
             self._safe_reset_store()
             return []
 
         if not isinstance(data, list):
-            _logger.warning("Resetting invalid process store '%s': root must be a JSON array.", self._store_file)
+            _logger.warning("Resetting invalid process store '%s': root must be a JSON array.", _PROCESSES_FILE)
             self._safe_reset_store()
             return []
 
@@ -53,13 +52,13 @@ class ProcessStore:
             try:
                 config = self._parse_process_entry(item, index=idx)
             except ProcessConfigError as exc:
-                _logger.warning("Discarding invalid entry in '%s': %s", self._store_file, exc)
+                _logger.warning("Discarding invalid entry in '%s': %s", _PROCESSES_FILE, exc)
                 needs_repair = True
                 continue
 
             key = config.name.casefold()
             if key in seen_names:
-                _logger.warning("Discarding duplicate process '%s' in '%s'.", config.name, self._store_file)
+                _logger.warning("Discarding duplicate process '%s' in '%s'.", config.name, _PROCESSES_FILE)
                 needs_repair = True
                 continue
 
@@ -67,7 +66,7 @@ class ProcessStore:
             processes.append(config)
 
         if len(processes) > MAX_PROCESSES:
-            _logger.warning("Purging %d excess process(es) in '%s'.", len(processes) - MAX_PROCESSES, self._store_file)
+            _logger.warning("Purging %d excess process(es) in '%s'.", len(processes) - MAX_PROCESSES, _PROCESSES_FILE)
             processes = processes[:MAX_PROCESSES]
             needs_repair = True
 
@@ -75,7 +74,7 @@ class ProcessStore:
             try:
                 self._save_to_disk(processes)
             except ProcessConfigError as exc:
-                _logger.warning("Could not save repaired process store '%s': %s", self._store_file, exc)
+                _logger.warning("Could not save repaired process store '%s': %s", _PROCESSES_FILE, exc)
 
         return processes
 
@@ -91,7 +90,7 @@ class ProcessStore:
         try:
             self._save_to_disk([])
         except ProcessConfigError as exc:
-            _logger.warning("Could not reset process store '%s': %s", self._store_file, exc)
+            _logger.warning("Could not reset process store '%s': %s", _PROCESSES_FILE, exc)
 
     def _save_to_disk(self, processes: Sequence[ProcessConfig]) -> None:
         """Persist process definitions atomically to disk."""
@@ -106,12 +105,12 @@ class ProcessStore:
         ]
 
         try:
-            self._store_file.parent.mkdir(parents=True, exist_ok=True)
-            tmp_path = self._store_file.with_suffix(f'{self._store_file.suffix}.tmp')
+            _PROCESSES_FILE.parent.mkdir(parents=True, exist_ok=True)
+            tmp_path = _PROCESSES_FILE.with_suffix(f'{_PROCESSES_FILE.suffix}.tmp')
             tmp_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-            tmp_path.replace(self._store_file)
+            tmp_path.replace(_PROCESSES_FILE)
         except OSError as exc:
-            raise ProcessConfigError(f"Could not save '{self._store_file}': {exc}") from exc
+            raise ProcessConfigError(f"Could not save '{_PROCESSES_FILE}': {exc}") from exc
 
     def _parse_process_entry(self, raw: object, *, index: int) -> ProcessConfig:
         if not isinstance(raw, Mapping):
