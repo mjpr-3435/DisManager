@@ -201,7 +201,7 @@ class ProcessStore:
         if match_idx is None:
             raise ProcessConfigError(f"Process '{config.name}' was not found.")
 
-        updated = list(self._configs)
+        updated = self._configs.copy()
         updated[match_idx] = config
         self._save_to_disk(updated)
         self._configs = updated
