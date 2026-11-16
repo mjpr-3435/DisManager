@@ -40,4 +40,5 @@ def _relaunch() -> None:
     cmd = [sys.executable, '-m', 'dismanager.cli', *sys.argv[1:]]
     if os.name == 'nt':
         sys.exit(subprocess.call(cmd))
-    os.execv(sys.executable, cmd)
+    elif os.name == 'posix':
+        os.execv(sys.executable, cmd)
