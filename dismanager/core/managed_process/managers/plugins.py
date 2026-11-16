@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -18,8 +17,6 @@ from ...extensions import (
 if TYPE_CHECKING:
     from ....discord.client import DisManagerClient
     from ..process import ManagedProcess
-
-_NON_IDENT_RE = re.compile(r'[^0-9a-zA-Z_]+')
 
 
 class PluginManager:
@@ -39,7 +36,7 @@ class PluginManager:
     async def load_plugins(self, *, reload: bool) -> int:
         """Discover and load plugins from ``<process>/.plugins/``, purging stale modules on reload."""
         if reload:
-            self._process._relay.enqueue(_('Reloading DisManager plugins...'))
+            self._process.add_log(_('Reloading DisManager plugins...'))
             await self.unload_plugins()
 
         root = self.plugins_dir
@@ -54,9 +51,8 @@ class PluginManager:
         if not candidates:
             return 0
 
-        proc_slug = _NON_IDENT_RE.sub('_', self._process.name).strip('_') or 'process'
         for plugin_name, module_path in candidates:
-            mod_name = f'_dismanager_plugin_{proc_slug}_{plugin_name}'
+            mod_name = f'_dismanager_plugin_{self._process.name}_{plugin_name}'
             try:
                 self._plugins[plugin_name] = load_extension_module(
                     mod_name,
@@ -71,9 +67,9 @@ class PluginManager:
         self._client._addons_manager.emit('on_plugins_load', self._process)
         count = len(self._plugins)
         if reload:
-            self._process._relay.enqueue(_('Reloaded {} plugin(s).').format(count))
+            self._process.add_log(_('Reloaded {} plugin(s).').format(count))
         elif count:
-            self._process._relay.enqueue(_('Loaded {} plugin(s).').format(count))
+            self._process.add_log(_('Loaded {} plugin(s).').format(count))
         return count
 
     async def unload_plugins(self) -> None:
