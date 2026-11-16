@@ -120,23 +120,7 @@ class ManagedProcess:
     def is_running(self) -> bool:
         """Return ``True`` while the subprocess is alive or its Discord relay is still draining."""
         return self._runner.is_alive or self._relay.is_active
-
-    def list_backups(self) -> list[BackupEntry]:
-        """Return existing numbered backups for this process, ordered 1..N."""
-        return self._backups.list_backups()
-
-    def make_backup(self, progress: list[int] | None = None) -> Path:
-        """Create a rotating backup of this process's directory."""
-        if self.is_running():
-            raise RuntimeError(f"Process '{self.name}' is currently running.")
-        return self._backups.make(self._client.config.backups, progress)
-
-    def restore_backup(self, backup_dir: Path, progress: list[int] | None = None) -> None:
-        """Restore ``backup_dir`` into this process's directory."""
-        if self.is_running():
-            raise RuntimeError(f"Process '{self.name}' is currently running.")
-        self._backups.restore(backup_dir, progress)
-
+    
     def start(self) -> bool:
         """Start the configured subprocess and begin reading its output."""
         if self.is_running():
@@ -209,3 +193,20 @@ class ManagedProcess:
     def ram_usage_bytes(self) -> int:
         """Return total RSS memory in bytes for the process tree."""
         return self._runner.ram_usage_bytes()
+
+    def list_backups(self) -> list[BackupEntry]:
+        """Return existing numbered backups for this process, ordered 1..N."""
+        return self._backups.list_backups()
+
+    def make_backup(self, progress: list[int] | None = None) -> Path:
+        """Create a rotating backup of this process's directory."""
+        if self.is_running():
+            raise RuntimeError(f"Process '{self.name}' is currently running.")
+        return self._backups.make(self._client.config.backups, progress)
+
+    def restore_backup(self, backup_dir: Path, progress: list[int] | None = None) -> None:
+        """Restore ``backup_dir`` into this process's directory."""
+        if self.is_running():
+            raise RuntimeError(f"Process '{self.name}' is currently running.")
+        self._backups.restore(backup_dir, progress)
+
