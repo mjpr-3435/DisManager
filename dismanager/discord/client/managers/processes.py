@@ -33,7 +33,7 @@ class ProcessManager:
         """Load process configurations and instantiate managed processes."""
         self.configs = load_processes()
         self._processes = {
-            proc.name: ManagedProcess(proc, self._client) for proc in self.configs
+            proc.name.casefold(): ManagedProcess(proc, self._client) for proc in self.configs
         }
 
     def list_processes(self) -> list[ManagedProcess]:
@@ -42,12 +42,12 @@ class ProcessManager:
 
     def get_config(self, name: str) -> ProcessConfig | None:
         """Return a configured process from in-memory state."""
-        return next((proc for proc in self.configs if proc.name == name), None)
+        target = name.strip().casefold()
+        return next((proc for proc in self.configs if proc.name.casefold() == target), None)
 
     def find(self, name: str) -> ManagedProcess | None:
         """Return a managed process matching ``name`` case-insensitively."""
-        target = name.strip().lower()
-        return next((proc for key, proc in self._processes.items() if key.lower() == target), None)
+        return self._processes.get(name.strip().casefold())
 
     async def reload_plugins(self, process_name: str | None = None) -> int:
         """Reload per-process plugins for ``process_name`` or all active processes."""
@@ -71,7 +71,7 @@ class ProcessManager:
         if event == 'new':
             assert isinstance(payload, ProcessConfig)
             self.configs = upsert_process(payload, is_edit=False)
-            self._processes[payload.name] = ManagedProcess(payload, self._client)
+            self._processes[payload.name.casefold()] = ManagedProcess(payload, self._client)
             try:
                 payload.resolve_path().mkdir(parents=True, exist_ok=True)
             except OSError as exc:
@@ -82,7 +82,7 @@ class ProcessManager:
         if event == 'update':
             assert isinstance(payload, ProcessConfig)
             self.configs = upsert_process(payload, is_edit=True)
-            process = self._processes.get(payload.name)
+            process = self._processes.get(payload.name.casefold())
             if process is not None:
                 process.update_config(payload)
             self._client._refresh_panel()
@@ -92,7 +92,7 @@ class ProcessManager:
             assert isinstance(payload, ProcessDeleteRequest)
             target_proc = self.get_config(payload.name)
             self.configs = delete_process(payload.name)
-            process = self._processes.pop(payload.name, None)
+            process = self._processes.pop(payload.name.casefold(), None)
             target_dir: Path | None = None
             if payload.delete_files and target_proc is not None:
                 root = Path.cwd().resolve()

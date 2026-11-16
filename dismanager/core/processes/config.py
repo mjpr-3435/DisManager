@@ -12,7 +12,7 @@ from ..bootstrap.paths import DATA_DIR
 _PROCESSES_FILE = DATA_DIR / 'processes.json'
 MAX_PROCESSES = 15
 
-_INVALID_NAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+_INVALID_NAME_CHARS = re.compile(r'[<>:"/\\|?*\s\x00-\x1f]')
 _logger = logging.getLogger(__name__)
 
 
@@ -51,7 +51,7 @@ def validate_process_data(
     """Validate and normalize raw fields into a ``ProcessConfig``."""
     clean_name = name.strip()
     if not clean_name or clean_name in {'.', '..'} or _INVALID_NAME_CHARS.search(clean_name):
-        raise ProcessConfigError('Process name must be a valid folder name.')
+        raise ProcessConfigError('Process name must be a valid folder name without spaces.')
 
     clean_start = start_command.strip()
     clean_stop = stop_command.strip()
@@ -94,7 +94,7 @@ def load_processes() -> list[ProcessConfig]:
             needs_repair = True
             continue
 
-        key = config.name.lower()
+        key = config.name.casefold()
         if key in seen_names:
             _logger.warning("Discarding duplicate process '%s' in '%s'.", config.name, _PROCESSES_FILE)
             needs_repair = True
@@ -148,8 +148,8 @@ def _save_processes(processes: Sequence[ProcessConfig]) -> None:
 def upsert_process(config: ProcessConfig, *, is_edit: bool) -> list[ProcessConfig]:
     """Create or update a process definition and persist the updated list."""
     processes = load_processes()
-    target_key = config.name.lower()
-    match_idx = next((idx for idx, proc in enumerate(processes) if proc.name.lower() == target_key), None)
+    target_key = config.name.casefold()
+    match_idx = next((idx for idx, proc in enumerate(processes) if proc.name.casefold() == target_key), None)
 
     if not is_edit:
         if match_idx is not None:
@@ -172,8 +172,8 @@ def upsert_process(config: ProcessConfig, *, is_edit: bool) -> list[ProcessConfi
 def delete_process(name: str) -> list[ProcessConfig]:
     """Delete a persisted process by name and save the updated list."""
     processes = load_processes()
-    target_key = name.strip().lower()
-    updated = [proc for proc in processes if proc.name.lower() != target_key]
+    target_key = name.strip().casefold()
+    updated = [proc for proc in processes if proc.name.casefold() != target_key]
     if len(updated) == len(processes):
         raise ProcessConfigError(f"Process '{name}' was not found.")
 
