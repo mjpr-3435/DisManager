@@ -6,6 +6,7 @@ import discord
 
 from ...core.bootstrap.i18n import _
 from ..utils import confirmation_request
+from .backups import BackupsView
 from .files import FilesView
 from .guide import build_guide_embed
 from .processes import ProcessesConfigView
@@ -21,6 +22,7 @@ class PanelView(discord.ui.View):
         super().__init__(timeout=None)
         self.bot = bot
         self.add_item(_ConfigButton(bot))
+        self.add_item(_BackupsButton(bot))
         self.add_item(_FilesButton(bot))
         self.add_item(_GuideButton())
         self.add_item(_RestartButton(bot))
@@ -52,6 +54,18 @@ class _ConfigButton(discord.ui.Button[PanelView]):
         await interaction.response.defer(ephemeral=True, thinking=True)
         view = ProcessesConfigView(self.bot)
         embed = view.render()
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+
+class _BackupsButton(discord.ui.Button[PanelView]):
+    def __init__(self, bot: DisManagerClient) -> None:
+        super().__init__(label='Backups', style=discord.ButtonStyle.gray)
+        self.bot = bot
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        view = BackupsView(self.bot)
+        embed = view.build_embed()
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
 

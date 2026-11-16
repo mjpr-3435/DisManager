@@ -2,43 +2,39 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
-from collections.abc import Callable
-from pathlib import Path
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
 import discord
 
 from ....core.bootstrap.i18n import _
-from ....core.bootstrap.paths import BACKUPS_DIR
 from ...utils import confirmation_request
-from .embed import format_bytes, to_dismanager_path
+from ..files.embed import format_bytes
 
 if TYPE_CHECKING:
     from ....core.managed_process import BackupEntry, ManagedProcess
     from ...client import DisManagerClient
-    from .views import FilesView
 
 
 class BackupsView(discord.ui.View):
-    """Interactive backup manager view for a process's `.backups/<process>` directory."""
+    """Interactive backup manager view for configured processes."""
 
-    def __init__(
-        self,
-        bot: DisManagerClient,
-        process: ManagedProcess,
-        *,
-        files_view: FilesView,
-    ) -> None:
+    def __init__(self, bot: DisManagerClient, process: ManagedProcess | None = None) -> None:
         super().__init__(timeout=None)
         self.bot = bot
-        self.process = process
-        self.files_view = files_view
+        processes = bot.processes
+        self.process: ManagedProcess | None = process if process is not None else (processes[0] if processes else None)
         self.entries: list[BackupEntry] = []
         self._build_items()
 
     def build_embed(self) -> discord.Embed:
-        """Render the backups summary embed for the current process."""
-        title_path = to_dismanager_path(self.process.backups_dir, self.files_view.root)
+        """Render the backups summary embed for the selected process."""
+        if self.process is None:
+            return discord.Embed(
+                title=f'📦 {_("Backups")}',
+                description=f'*{_("No processes configured.")}*',
+                color=0x2B2D31,
+            )
 
         if not self.entries:
             description = f'*{_("No backups found.")}*'
@@ -55,11 +51,11 @@ class BackupsView(discord.ui.View):
             description = '\n\n'.join(lines)
 
         embed = discord.Embed(
-            title=f'📁 {title_path}',
+            title=f'📦 {_("Backups")} — {self.process.name}',
             description=description,
             color=0x2B2D31,
         )
-        embed.set_footer(text=_('Max backups: {}').format(self.bot._config.backups))
+        embed.set_footer(text=_('Max backups: {}').format(self.bot.config.backups))
         return embed
 
     async def refresh(self, interaction: discord.Interaction[Any], *, message_id: int | None = None) -> None:
@@ -74,20 +70,52 @@ class BackupsView(discord.ui.View):
                 message_id=target_id,
                 embed=embed,
                 view=self,
-                attachments=[],
             )
 
     def _build_items(self) -> None:
         self.clear_items()
+        processes = self.bot.processes
+        if self.process is not None:
+            self.process = self.bot.find_process(self.process.name)
+        if self.process is None and processes:
+            self.process = processes[0]
+
+        if not processes or self.process is None:
+            self.entries = []
+            return
+
         self.entries = self.process.list_backups()
-        self.add_item(_BackupSelect(self.bot, self.entries))
-        self.add_item(_BackButton(self.bot, row=1))
-        self.add_item(_UpdateButton(self.bot, row=1))
-        self.add_item(_FilesButton(self.bot, row=1))
+        self.add_item(_ProcessSelect(processes, self.process))
+        self.add_item(_BackupSelect(self.entries))
+        self.add_item(_UpdateButton(row=2))
+
+
+# =========================================
+#            Internal Helpers
+# =========================================
+
+
+class _ProcessSelect(discord.ui.Select[BackupsView]):
+    def __init__(self, processes: Sequence[ManagedProcess], current: ManagedProcess) -> None:
+        options = [
+            discord.SelectOption(
+                label=proc.name[:100],
+                value=proc.name,
+                default=proc.name == current.name,
+            )
+            for proc in processes[:25]
+        ]
+        super().__init__(placeholder=_('Select a process'), options=options, row=0)
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        assert self.view is not None
+        await interaction.response.defer()
+        self.view.process = self.view.bot.find_process(self.values[0])
+        await self.view.refresh(interaction)
 
 
 class _BackupSelect(discord.ui.Select[BackupsView]):
-    def __init__(self, bot: DisManagerClient, entries: list[BackupEntry]) -> None:
+    def __init__(self, entries: list[BackupEntry]) -> None:
         options = [
             discord.SelectOption(
                 label=_('➕ [Make Backup]'),
@@ -104,12 +132,16 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
                     description=desc[:100],
                 )
             )
-        super().__init__(placeholder=_('Select a backup'), options=options, row=0)
+        super().__init__(placeholder=_('Select a backup'), options=options, row=1)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         view = self.view
         process = view.process
+        if process is None:
+            await interaction.response.defer()
+            await view.refresh(interaction)
+            return
 
         if process.is_running():
             await interaction.response.send_message(
@@ -171,6 +203,8 @@ async def _run_backup_job(
     progress_template: str,
     done_message: str,
 ) -> None:
+    assert view.process is not None
+    process_name = view.process.name
     progress = [0, 0]
     task = asyncio.create_task(asyncio.to_thread(worker, progress))
     last_snapshot: tuple[int, int] | None = None
@@ -181,7 +215,7 @@ async def _run_backup_job(
             last_snapshot = snapshot
             with contextlib.suppress(discord.HTTPException):
                 await confirm_interaction.edit_original_response(
-                    content=progress_template.format(view.process.name, snapshot[0], snapshot[1]),
+                    content=progress_template.format(process_name, snapshot[0], snapshot[1]),
                 )
         await asyncio.sleep(1.0)
 
@@ -201,30 +235,11 @@ async def _run_backup_job(
         await confirm_interaction.user.send(done_message)
 
 
-class _BackButton(discord.ui.Button[BackupsView]):
-    def __init__(self, bot: DisManagerClient, *, row: int) -> None:
-        super().__init__(label=_('Back'), style=discord.ButtonStyle.secondary, row=row)
-
-    async def callback(self, interaction: discord.Interaction[Any]) -> None:
-        assert self.view is not None
-        await self.view.files_view.navigate(interaction, BACKUPS_DIR.resolve())
-
-
 class _UpdateButton(discord.ui.Button[BackupsView]):
-    def __init__(self, bot: DisManagerClient, *, row: int) -> None:
+    def __init__(self, *, row: int) -> None:
         super().__init__(label=_('Update'), style=discord.ButtonStyle.secondary, row=row)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
         await interaction.response.defer()
         await self.view.refresh(interaction)
-
-
-class _FilesButton(discord.ui.Button[BackupsView]):
-    def __init__(self, bot: DisManagerClient, *, row: int) -> None:
-        super().__init__(label=_('Files'), style=discord.ButtonStyle.primary, row=row)
-
-    async def callback(self, interaction: discord.Interaction[Any]) -> None:
-        assert self.view is not None
-        target: Path = self.view.process.backups_dir
-        await self.view.files_view.navigate(interaction, target, open_backups_ui=False)

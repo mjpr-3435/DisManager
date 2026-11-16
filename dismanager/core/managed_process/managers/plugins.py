@@ -5,8 +5,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from ..bootstrap.i18n import _
-from ..extensions import (
+from ...bootstrap.i18n import _
+from ...extensions import (
     discover_extension_candidates,
     dispatch_hook,
     ensure_on_sys_path,
@@ -16,8 +16,8 @@ from ..extensions import (
 )
 
 if TYPE_CHECKING:
-    from ...discord.client import DisManagerClient
-    from .process import ManagedProcess
+    from ....discord.client import DisManagerClient
+    from ..process import ManagedProcess
 
 _NON_IDENT_RE = re.compile(r'[^0-9a-zA-Z_]+')
 

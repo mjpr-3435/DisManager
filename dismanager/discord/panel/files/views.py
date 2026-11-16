@@ -6,9 +6,7 @@ from typing import TYPE_CHECKING, Any
 import discord
 
 from ....core.bootstrap.i18n import _
-from ....core.bootstrap.paths import BACKUPS_DIR
 from .actions import DirectoryActionsSelect, FileActionsSelect
-from .backups import BackupsView
 from .embed import build_files_embed, get_max_page, list_directory_entries
 from .modals import GoToPathModal
 from .preview import build_file_attachment
@@ -52,27 +50,12 @@ class FilesView(discord.ui.View):
         *,
         page: int = 1,
         size_text: str | None = None,
-        open_backups_ui: bool = True,
     ) -> None:
         """Render ``path`` and edit the ephemeral Files message."""
         if not interaction.response.is_done():
             await interaction.response.defer()
 
         clamped = _clamp_to_root(path, self.root)
-        if open_backups_ui and clamped.is_dir() and clamped.parent == BACKUPS_DIR.resolve():
-            process = self.bot.find_process(clamped.name)
-            if process is not None:
-                backups_view = BackupsView(self.bot, process, files_view=self)
-                message = interaction.message
-                if message is not None:
-                    await interaction.followup.edit_message(
-                        message_id=message.id,
-                        embed=backups_view.build_embed(),
-                        view=backups_view,
-                        attachments=[],
-                    )
-                return
-
         embed = self.render(clamped, page=page, size_text=size_text)
         attachment = build_file_attachment(self.path)
         message = interaction.message
