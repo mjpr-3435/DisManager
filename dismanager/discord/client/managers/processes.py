@@ -34,6 +34,33 @@ class ProcessManager:
 
     # --- Internal Behaviour ---
 
+    def _create_process(self, config: ProcessConfig) -> None:
+        self.configs = upsert_process(config, is_edit=False)
+        self._processes[config.name.casefold()] = ManagedProcess(config, self._client)
+        try:
+            config.resolve_path().mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise ProcessConfigError(f"Could not create process folder '{config.name}': {exc}") from exc
+
+    def _update_process(self, config: ProcessConfig) -> None:
+        self.configs = upsert_process(config, is_edit=True)
+        process = self._processes.get(config.name.casefold())
+        if process is not None:
+            process.update_config(config)
+
+    def _delete_process(self, request: ProcessDeleteRequest) -> None:
+        target_proc = self.get_config(request.name)
+        self.configs = delete_process(request.name)
+        process = self._processes.pop(request.name.casefold(), None)
+        target_dir: Path | None = None
+        if request.delete_files and target_proc is not None:
+            root = Path.cwd().resolve()
+            candidate_dir = target_proc.resolve_path().resolve()
+            if candidate_dir != root and candidate_dir.is_relative_to(root):
+                target_dir = candidate_dir
+        if process is not None or target_dir is not None:
+            asyncio.create_task(self._cleanup_deleted_process(process, target_dir))
+
     async def _cleanup_deleted_process(
         self,
         process: ManagedProcess | None,
@@ -77,41 +104,17 @@ class ProcessManager:
         """Persist process changes, update client state, and handle folder side effects."""
         if event == 'new':
             assert isinstance(payload, ProcessConfig)
-            self.configs = upsert_process(payload, is_edit=False)
-            self._processes[payload.name.casefold()] = ManagedProcess(payload, self._client)
-            try:
-                payload.resolve_path().mkdir(parents=True, exist_ok=True)
-            except OSError as exc:
-                raise ProcessConfigError(f"Could not create process folder '{payload.name}': {exc}") from exc
-            self._client._refresh_panel()
-            return
-
-        if event == 'update':
+            self._create_process(payload)
+        elif event == 'update':
             assert isinstance(payload, ProcessConfig)
-            self.configs = upsert_process(payload, is_edit=True)
-            process = self._processes.get(payload.name.casefold())
-            if process is not None:
-                process.update_config(payload)
-            self._client._refresh_panel()
-            return
-
-        if event == 'delete':
+            self._update_process(payload)
+        elif event == 'delete':
             assert isinstance(payload, ProcessDeleteRequest)
-            target_proc = self.get_config(payload.name)
-            self.configs = delete_process(payload.name)
-            process = self._processes.pop(payload.name.casefold(), None)
-            target_dir: Path | None = None
-            if payload.delete_files and target_proc is not None:
-                root = Path.cwd().resolve()
-                candidate_dir = target_proc.resolve_path().resolve()
-                if candidate_dir != root and candidate_dir.is_relative_to(root):
-                    target_dir = candidate_dir
-            if process is not None or target_dir is not None:
-                asyncio.create_task(self._cleanup_deleted_process(process, target_dir))
-            self._client._refresh_panel()
-            return
+            self._delete_process(payload)
+        else:
+            raise ValueError(f'Unsupported process edit event: {event}')
 
-        raise ValueError(f'Unsupported process edit event: {event}')
+        self._client._refresh_panel()
 
     async def shutdown_all(self) -> None:
         """Shut down all running processes cleanly within timeout."""
