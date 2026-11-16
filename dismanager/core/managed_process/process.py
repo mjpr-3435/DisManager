@@ -69,7 +69,6 @@ class ManagedProcess:
         """Update process configuration in-place."""
         self._config = config
         self._runner.update_config(config)
-        self._backups.update_source_dir(config.resolve_path())
 
     async def _delete_folder(self) -> None:
         """Safely delete the process working directory if it resides under the workspace root."""

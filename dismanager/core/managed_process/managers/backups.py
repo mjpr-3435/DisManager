@@ -37,10 +37,6 @@ class BackupManager:
         """Return the resolved ``.backups/<process_name>`` directory."""
         return (BACKUPS_DIR / self._process_name).resolve()
 
-    def update_source_dir(self, source_dir: Path) -> None:
-        """Update the target process directory when config changes."""
-        self._source_dir = source_dir
-
     def list_backups(self) -> list[BackupEntry]:
         """Return existing numbered backups, ordered 1..N."""
         root = self.backups_dir
