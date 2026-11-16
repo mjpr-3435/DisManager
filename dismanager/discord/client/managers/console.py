@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+import contextlib
+import os
+import sys
+import threading
+import time
+from typing import TYPE_CHECKING, Literal, cast
 
 from ....core.bootstrap.i18n import _
-from ....core.console import ProcessAction, build_console_handler, console_loop
 from ....core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
@@ -14,32 +18,87 @@ if TYPE_CHECKING:
 class ConsoleManager:
     """Manages the local interactive terminal loop and its DisManager commands."""
 
+    _task: asyncio.Task[None] | None
+
     def __init__(self, client: DisManagerClient) -> None:
         self._client = client
-        self._task: asyncio.Task[None] | None = None
+        self._task = None
 
-    def start(self) -> None:
-        """Start the interactive console task."""
-        header = (
-            f"{_('Commands')}: "
-            'start, stop, restart, kill, plreload, adreload, status, exit'
-        )
-        handler = build_console_handler(
-            self._client.close,
-            self._client.reload_addons,
-            self._client._processes_manager.reload_plugins,
-            self._process_action,
-            self._status,
-        )
-        self._task = asyncio.create_task(console_loop(handler, header=header))
 
-    def stop(self) -> None:
-        """Cancel the local console task if it is still running."""
-        current = asyncio.current_task()
-        if self._task is not None and self._task is not current and not self._task.done():
-            self._task.cancel()
+    # --- Internal Behaviour ---
 
-    async def _process_action(self, action: ProcessAction, name: str) -> str:
+    async def _loop(self, *, header: str) -> None:
+        """Read console commands asynchronously without blocking the event loop."""
+        loop = asyncio.get_running_loop()
+        lines: asyncio.Queue[str | None] = asyncio.Queue()
+        stop_event = threading.Event()
+
+        def _reader() -> None:
+            try:
+                while not stop_event.is_set():
+                    if not _wait_for_stdin(stop_event):
+                        break
+                    line = sys.stdin.readline()
+                    with contextlib.suppress(RuntimeError):
+                        loop.call_soon_threadsafe(lines.put_nowait, line or None)
+                    if not line:
+                        break
+            except (OSError, ValueError):
+                pass
+
+        threading.Thread(target=_reader, daemon=True, name='console-stdin').start()
+
+        try:
+            while True:
+                print(f'\n{header}')
+                sys.stdout.write('>> ')
+                sys.stdout.flush()
+
+                line = await lines.get()
+                if line is None:
+                    break
+
+                command = line.strip()
+                if not command:
+                    continue
+
+                if not await self._handle(command):
+                    break
+        finally:
+            stop_event.set()
+
+    async def _handle(self, raw_command: str) -> bool:
+        parts = raw_command.split(maxsplit=1)
+        cmd = parts[0].lower()
+        arg = parts[1].strip() if len(parts) > 1 else ''
+
+        if cmd == 'exit':
+            await self._client.close()
+            return False
+
+        if cmd == 'adreload':
+            count = await self._client.reload_addons()
+            print(_('Reloaded {} addon(s).').format(count))
+            return True
+
+        if cmd == 'plreload':
+            count = await self._client._processes_manager.reload_plugins(arg or None)
+            print(_('Reloaded {} plugin(s).').format(count))
+            return True
+
+        if cmd in ('start', 'stop', 'restart', 'kill'):
+            action = cast(Literal['start', 'stop', 'restart', 'kill'], cmd)
+            print(await self._process_action(action, arg))
+            return True
+
+        if cmd == 'status':
+            print(self._status())
+            return True
+
+        print(_("Unknown command: '{}'.").format(cmd))
+        return True
+
+    async def _process_action(self, action: Literal['start', 'stop', 'restart', 'kill'], name: str) -> str:
         target = name.strip()
         if not target:
             return _('Specify the process. E.g.: {} <name>').format(action)
@@ -83,3 +142,49 @@ class ConsoleManager:
             else:
                 lines.append(f'  • {proc.name}: {_("Offline")}')
         return '\n'.join(lines)
+    
+    # --- Internal API ---
+
+
+    def start(self) -> None:
+        """Start the interactive console task."""
+        header = (
+            f"{_('Commands')}: "
+            'start, stop, restart, kill, plreload, adreload, status, exit'
+        )
+        self._task = asyncio.create_task(self._loop(header=header))
+
+    def stop(self) -> None:
+        """Cancel the local console task if it is still running."""
+        current = asyncio.current_task()
+        if self._task is not None and self._task is not current and not self._task.done():
+            self._task.cancel()
+
+# =========================================
+#            Internal Helpers
+# =========================================
+
+
+def _wait_for_stdin(stop_event: threading.Event) -> bool:
+    if not sys.stdin.isatty():
+        return True
+
+    if os.name == 'nt':
+        import msvcrt
+
+        while not stop_event.is_set():
+            if msvcrt.kbhit():
+                return True
+            time.sleep(0.05)
+        return False
+
+    if os.name == 'posix':
+        import select
+
+        while not stop_event.is_set():
+            ready, _, _ = select.select([sys.stdin], [], [], 0.05)
+            if ready:
+                return True
+        return False
+
+    return True
