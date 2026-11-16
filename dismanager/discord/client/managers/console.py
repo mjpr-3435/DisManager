@@ -36,7 +36,7 @@ class ConsoleManager:
         """Read console commands asynchronously without blocking the event loop."""
         header = (
             f"{_('Commands')}: "
-            'start[-all], stop[-all], restart[-all], kill[-all], plreload[-all], adreload, status, exit'
+            'start, stop, restart, kill, plreload, adreload, status, exit'
         )
         loop = asyncio.get_running_loop()
         # Bridge queue between the blocking stdin thread and the asyncio event loop (None signals EOF).
