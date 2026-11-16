@@ -19,11 +19,14 @@ if TYPE_CHECKING:
 class ProcessRunner:
     """Low-level OS subprocess runner with stdout reading and process-tree control."""
 
+    _process       : subprocess.Popen[bytes] | None
+    _reader_thread : threading.Thread | None
+
     def __init__(self, process: ManagedProcess) -> None:
-        self._process_obj = process
-        self._process: subprocess.Popen[bytes] | None = None
+        self._process_obj    = process
+        self._process        = None
         self._stop_requested = False
-        self._reader_thread: threading.Thread | None = None
+        self._reader_thread  = None
 
     # --- Internal Behaviour ---
 
