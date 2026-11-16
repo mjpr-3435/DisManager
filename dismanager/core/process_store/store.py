@@ -28,14 +28,6 @@ class ProcessStore:
 
     # --- Internal Behaviour ---
 
-    def _build_config(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
-        return validate_process_data(
-            name=target,
-            start_command=payload['start_command'],
-            stop_command=payload['stop_command'],
-            blacklist=payload['blacklist'],
-        )
-
     def _read_from_disk(self) -> list[ProcessConfig]:
         if not self._store_file.exists():
             return []
@@ -86,6 +78,14 @@ class ProcessStore:
                 _logger.warning("Could not save repaired process store '%s': %s", self._store_file, exc)
 
         return processes
+
+    def _build_config(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
+        return validate_process_data(
+            name=target,
+            start_command=payload['start_command'],
+            stop_command=payload['stop_command'],
+            blacklist=payload['blacklist'],
+        )
 
     def _safe_reset_store(self) -> None:
         try:
