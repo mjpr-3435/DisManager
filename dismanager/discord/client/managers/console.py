@@ -89,13 +89,8 @@ class ConsoleManager:
             print(_('Reloaded {} addon(s).').format(count))
             return True
 
-        if cmd == 'plreload':
-            count = await self._client._processes_manager.reload_plugins(arg or None)
-            print(_('Reloaded {} plugin(s).').format(count))
-            return True
-
-        if cmd in ('start', 'stop', 'restart', 'kill'):
-            action = cast(Literal['start', 'stop', 'restart', 'kill'], cmd)
+        if cmd in ('start', 'stop', 'restart', 'kill', 'plreload'):
+            action = cast(Literal['start', 'stop', 'restart', 'kill', 'plreload'], cmd)
             print(await self._process_action(action, arg))
             return True
 
@@ -106,7 +101,7 @@ class ConsoleManager:
         print(_("Unknown command: '{}'.").format(cmd))
         return True
 
-    async def _process_action(self, action: Literal['start', 'stop', 'restart', 'kill'], name: str) -> str:
+    async def _process_action(self, action: Literal['start', 'stop', 'restart', 'kill', 'plreload'], name: str) -> str:
         target = name.strip()
         if not target:
             return _('Specify the process. E.g.: {} <name>').format(action)
@@ -133,9 +128,13 @@ class ConsoleManager:
         if action == 'kill':
             process.kill()
             return _('[{}]: Killing process.').format(process.name)
-
-        asyncio.create_task(process.restart())
-        return _('[{}]: Restarting process.').format(process.name)
+        if action == 'restart':
+            asyncio.create_task(process.restart())
+            return _('[{}]: Restarting process.').format(process.name)
+        if action == 'plreload':
+            count = await process.reload_plugins()
+            return _('[{}]: Reloaded {} plugin(s).').format(process.name, count)
+        raise ValueError(f'Unsupported process action: {action}')
 
     def _status(self) -> str:
         processes = self._client.processes

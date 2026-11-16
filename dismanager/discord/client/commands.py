@@ -53,16 +53,7 @@ class _BotCommands(commands.Cog):
 
     @commands.command(name='plreload')
     async def plreload_command(self, ctx: commands.Context[DisManagerClient], *, name: str = '') -> None:
-        if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
-            return
-        with contextlib.suppress(discord.HTTPException):
-            await ctx.message.delete()
-        target = name.strip() or None
-        if target is not None and self.bot.find_process(target) is None:
-            await ctx.send(_('✖ Process `{}` not found.').format(target), delete_after=3)
-            return
-        count = await self.bot._processes_manager.reload_plugins(target)
-        await ctx.send(_('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
+        await self._run_process_command(ctx, 'plreload', name)
 
     @commands.command(name='adreload')
     async def adreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:
@@ -76,7 +67,7 @@ class _BotCommands(commands.Cog):
     async def _run_process_command(
         self,
         ctx: commands.Context[DisManagerClient],
-        action: Literal['start', 'stop', 'kill', 'restart'],
+        action: Literal['start', 'stop', 'kill', 'restart', 'plreload'],
         name: str,
     ) -> None:
         if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
@@ -120,9 +111,12 @@ class _BotCommands(commands.Cog):
         elif action == 'kill':
             process.kill()
             await ctx.send(f'✔ `[{process.name}]`: Killing process.', delete_after=2)
-        else:
+        elif action == 'restart':
             asyncio.create_task(process.restart())
             await ctx.send(f'✔ `[{process.name}]`: Restarting process.', delete_after=2)
+        elif action == 'plreload':
+            count = await process.reload_plugins()
+            await ctx.send(_('✔ `[{}`]: Reloaded {} plugin(s).').format(process.name, count), delete_after=2)
 
 
 async def setup(bot: DisManagerClient) -> None:

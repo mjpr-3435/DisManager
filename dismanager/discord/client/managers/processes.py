@@ -69,19 +69,6 @@ class ProcessManager:
             proc.name.casefold(): ManagedProcess(proc, self._client) for proc in self.configs
         }
 
-    async def reload_plugins(self, process_name: str | None = None) -> int:
-        """Reload per-process plugins for ``process_name`` or all active processes."""
-        if process_name is not None:
-            process = self.find(process_name)
-            if process is None:
-                return 0
-            return await process.reload_plugins()
-
-        total = 0
-        for process in list(self._processes.values()):
-            total += await process.reload_plugins()
-        return total
-
     def on_edit(
         self,
         event: Literal['new', 'update', 'delete'],
