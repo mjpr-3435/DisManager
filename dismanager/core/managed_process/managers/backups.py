@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ...bootstrap.paths import BACKUPS_DIR
-from ...utils import (
+from ...files import (
     clear_directory_contents,
     copy_tree_with_progress,
     count_files,
-    dir_size_bytes,
+    path_size_bytes,
     remove_path,
 )
 
@@ -53,7 +53,7 @@ class BackupManager:
                 name=path.name,
                 path=path,
                 created_at=_read_backup_timestamp(path / BACKUP_LOG_FILENAME),
-                size_bytes=dir_size_bytes(path),
+                size_bytes=path_size_bytes(path),
             )
             for _, path in indexed
         ]

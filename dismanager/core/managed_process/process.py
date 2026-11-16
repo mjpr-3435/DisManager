@@ -6,8 +6,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from ..files import path_size_bytes
 from ..process_store import ProcessConfig
-from ..utils import dir_size_bytes
 from .managers import (
     BackupEntry,
     BackupManager,
@@ -175,7 +175,7 @@ class ManagedProcess:
 
     def disk_usage_bytes(self) -> int:
         """Return total disk usage in bytes of this process's working directory."""
-        return dir_size_bytes(self._config.resolve_path())
+        return path_size_bytes(self._config.resolve_path())
 
     # Backups
 
