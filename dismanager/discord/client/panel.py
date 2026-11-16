@@ -115,13 +115,13 @@ class PanelManager:
         self.error_thread = await get_or_create_thread(channel, _ERROR_THREAD_NAME)
         return True
 
-    def start(self) -> None:
-        """Start the background panel refresh loop."""
-        self._task = asyncio.create_task(self._loop())
-
     def refresh(self) -> None:
         """Trigger an immediate panel refresh."""
         self._refresh_event.set()
+
+    def start(self) -> None:
+        """Start the background panel refresh loop."""
+        self._task = asyncio.create_task(self._loop())
 
     async def close(self) -> None:
         """Cancel the panel loop and mark the panel message offline."""
