@@ -17,15 +17,20 @@ class ProcessManager:
     """Manages runtime ``ManagedProcess`` instances and syncs them with ``ProcessStore``."""
 
     _processes  : dict[str, ManagedProcess]
+    _deleting   : set[str]
 
     def __init__(self, client: DisManagerClient) -> None:
         self._client    = client
         self._store     = ProcessStore()
         self._processes = {}
+        self._deleting  = set()
 
     # --- Internal Behaviour ---
 
     def _create_process(self, target: str, payload: Mapping[str, Any]) -> None:
+        if target.strip().casefold() in self._deleting:
+            raise ProcessConfigError(f"Process '{target.strip()}' is still being deleted. Please wait.")
+        
         config = self._store.create(target, payload)
         self._processes[config.name.casefold()] = ManagedProcess(config, self._client)
 
@@ -35,18 +40,23 @@ class ProcessManager:
 
     def _delete_process(self, target: str, payload: Mapping[str, Any]) -> None:
         removed = self._store.delete(target)
-        process = self._processes.pop(removed.name.casefold())
+        key = removed.name.casefold()
+        process = self._processes.pop(key)
+        self._deleting.add(key)
         asyncio.create_task(
-            self._cleanup_deleted_process(process, delete_files=bool(payload['delete_files']))
+            self._cleanup_deleted_process(process, key=key, delete_files=bool(payload['delete_files']))
         )
 
-    async def _cleanup_deleted_process(self, process: ManagedProcess, *, delete_files: bool) -> None:
-        await process.shutdown()
-        if delete_files:
-            try:
-                await process.delete_folder()
-            except OSError:
-                await self._client.report_error(f'DeleteProcess:{process.name}')
+    async def _cleanup_deleted_process(self, process: ManagedProcess, *, key: str, delete_files: bool) -> None:
+        try:
+            await process.shutdown()
+            if delete_files:
+                try:
+                    await process.delete_folder()
+                except OSError:
+                    await self._client.report_error(f'DeleteProcess:{process.name}')
+        finally:
+            self._deleting.discard(key)
 
     # --- Internal API ---
 

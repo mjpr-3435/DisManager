@@ -22,14 +22,12 @@ class ManagedProcess:
         self._client = client
 
         # Internal managers
-        self._runner = ProcessRunner(config, on_line=self._on_output_line, on_exit=self._on_process_exit)
-        self._relay = ConsoleRelay(config.name, client)
-        self._plugins = PluginManager(self, client)
-        self._backups = BackupManager(config.name, config.resolve_path())
+        self._runner    = ProcessRunner(config, on_line=self._on_output_line, on_exit=self._on_process_exit)
+        self._relay     = ConsoleRelay(config.name, client)
+        self._plugins   = PluginManager(self, client)
+        self._backups   = BackupManager(config.name, config.resolve_path())
 
         config.resolve_path().mkdir(parents=True, exist_ok=True)
-        self._plugins.plugins_dir.mkdir(parents=True, exist_ok=True)
-        asyncio.create_task(self.ensure_console_thread())
 
     # --- Internal Behaviour ---
 
@@ -118,6 +116,30 @@ class ManagedProcess:
             raise RuntimeError(f"Process '{self.name}' is currently running.")
         self._backups.restore(backup_dir, progress)
 
+    def emit_plugin_event(self, event_name: str, *args: object) -> None:
+        """Schedule a plugin event dispatch on the active event loop."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._plugins.call_plugins(event_name, *args))
+
+
+    async def send_logs(self) -> None:
+        """Send this process's recent 8 MB log buffer to its Discord console thread."""
+        await self._relay.send_log_file(self._runner.recent_log_bytes())
+
+
+    def execute(self, command: str) -> bool:
+        """Write a command line to the subprocess stdin."""
+        return self._runner.execute(command)
+
+    def ram_usage_bytes(self) -> int:
+        """Return total RSS memory in bytes for the process tree."""
+        return self._runner.ram_usage_bytes()
+
+
+    
     def start(self) -> bool:
         """Start the configured subprocess and begin reading its output."""
         if self.is_running():
@@ -134,20 +156,6 @@ class ManagedProcess:
             loop.create_task(self._on_start_plugins())
         self._client._addons_manager.emit('on_process_start', self)
         return True
-
-    async def reload_plugins(self) -> int:
-        """Reload per-process plugins when this process is running."""
-        if not self.is_running():
-            return 0
-        return await self._plugins.load_plugins(reload=True)
-
-    def emit_plugin_event(self, event_name: str, *args: object) -> None:
-        """Schedule a plugin event dispatch on the active event loop."""
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        loop.create_task(self._plugins.call_plugins(event_name, *args))
 
     def stop(self) -> bool:
         """Request a graceful stop via ``stop_command``, or fall back to ``kill()``."""
@@ -187,14 +195,12 @@ class ManagedProcess:
 
         return self.start()
 
-    async def ensure_console_thread(self) -> None:
-        """Ensure this process's ``Console <name>`` Discord thread exists."""
-        await self._relay.ensure_thread()
-
-    async def send_logs(self) -> None:
-        """Send this process's recent 8 MB log buffer to its Discord console thread."""
-        await self._relay.send_log_file(self._runner.recent_log_bytes())
-
+    async def reload_plugins(self) -> int:
+        """Reload per-process plugins when this process is running."""
+        if not self.is_running():
+            return 0
+        return await self._plugins.load_plugins(reload=True)
+    
     async def shutdown(self) -> None:
         """Stop the subprocess gracefully, force-kill after 60 s, and drain its Discord relay."""
         if self._runner.is_alive:
@@ -206,11 +212,3 @@ class ManagedProcess:
                 self.kill()
         await self._relay.shutdown()
         await self._plugins.unload_plugins()
-
-    def execute(self, command: str) -> bool:
-        """Write a command line to the subprocess stdin."""
-        return self._runner.execute(command)
-
-    def ram_usage_bytes(self) -> int:
-        """Return total RSS memory in bytes for the process tree."""
-        return self._runner.ram_usage_bytes()

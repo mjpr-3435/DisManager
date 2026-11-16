@@ -29,6 +29,7 @@ class PluginManager:
         self._process = process
         self._client = client
         self._plugins: dict[str, object] = {}
+        self.plugins_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def plugins_dir(self) -> Path:

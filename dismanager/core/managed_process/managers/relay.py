@@ -32,6 +32,8 @@ class ConsoleRelay:
         self._thread: discord.Thread | None = None
         self._stop_reason: str | None = None
         self._finished = False
+        with contextlib.suppress(RuntimeError):
+            asyncio.get_running_loop().create_task(self.ensure_thread())
 
     @property
     def thread(self) -> discord.Thread | None:
