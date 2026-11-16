@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from ....core.bootstrap.i18n import _
 from ....core.managed_process import ManagedProcess
-from ....core.process_store import ProcessConfig, ProcessStore
+from ....core.process_store import ProcessConfig, ProcessConfigError, ProcessStore
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
@@ -93,13 +93,16 @@ class ProcessManager:
         self._client._panel_manager.refresh()
 
     async def shutdown_all(self) -> None:
-        """Shut down all running processes cleanly within timeout."""
-        if not self._processes:
-            return
-        if any(proc.is_running() for proc in self._processes.values()):
-            print(_('Closing processes...'))
-        with contextlib.suppress(TimeoutError):
-            await asyncio.wait_for(
-                asyncio.gather(*(proc.shutdown() for proc in self._processes.values()), return_exceptions=True),
-                timeout=65.0,
-            )
+        """Shut down all running processes cleanly within timeout and flush store state."""
+        if self._processes:
+            if any(proc.is_running() for proc in self._processes.values()):
+                print(_('Closing processes...'))
+            with contextlib.suppress(TimeoutError):
+                await asyncio.wait_for(
+                    asyncio.gather(*(proc.shutdown() for proc in self._processes.values()), return_exceptions=True),
+                    timeout=65.0,
+                )
+        try:
+            self._store.save()
+        except ProcessConfigError:
+            await self._client.report_error('ProcessStore.save')

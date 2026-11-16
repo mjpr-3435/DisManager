@@ -172,6 +172,10 @@ class ProcessStore:
         self._configs = self._read_from_disk()
         return tuple(self._configs)
 
+    def save(self) -> None:
+        """Persist the current in-memory process configurations to disk."""
+        self._save_to_disk(self._configs)
+
     def get(self, name: str) -> ProcessConfig | None:
         """Return a configured process matching ``name`` case-insensitively."""
         target = name.strip().casefold()
@@ -180,15 +184,14 @@ class ProcessStore:
     def create(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
         """Validate, persist, and create the working folder for a new process."""
         config = self._build_config(target, payload)
-        processes = self._read_from_disk()
         key = config.name.casefold()
 
-        if any(proc.name.casefold() == key for proc in processes):
+        if any(proc.name.casefold() == key for proc in self._configs):
             raise ProcessConfigError(f"A process named '{config.name}' already exists.")
-        if len(processes) >= MAX_PROCESSES:
+        if len(self._configs) >= MAX_PROCESSES:
             raise ProcessConfigError(f'Maximum of {MAX_PROCESSES} processes reached.')
 
-        updated = [*processes, config]
+        updated = [*self._configs, config]
         self._save_to_disk(updated)
         try:
             config.resolve_path().mkdir(parents=True, exist_ok=True)
@@ -201,13 +204,12 @@ class ProcessStore:
     def update(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
         """Validate and persist updates to an existing process configuration."""
         config = self._build_config(target, payload)
-        processes = self._read_from_disk()
         key = config.name.casefold()
-        match_idx = next((idx for idx, proc in enumerate(processes) if proc.name.casefold() == key), None)
+        match_idx = next((idx for idx, proc in enumerate(self._configs) if proc.name.casefold() == key), None)
         if match_idx is None:
             raise ProcessConfigError(f"Process '{config.name}' was not found.")
 
-        updated = list(processes)
+        updated = list(self._configs)
         updated[match_idx] = config
         self._save_to_disk(updated)
         self._configs = updated
@@ -215,13 +217,12 @@ class ProcessStore:
 
     def delete(self, target: str) -> ProcessConfig:
         """Remove a persisted process by name and return the removed configuration."""
-        processes = self._read_from_disk()
         target_key = target.strip().casefold()
-        removed = next((proc for proc in processes if proc.name.casefold() == target_key), None)
+        removed = next((proc for proc in self._configs if proc.name.casefold() == target_key), None)
         if removed is None:
             raise ProcessConfigError(f"Process '{target}' was not found.")
 
-        updated = [proc for proc in processes if proc.name.casefold() != target_key]
+        updated = [proc for proc in self._configs if proc.name.casefold() != target_key]
         self._save_to_disk(updated)
         self._configs = updated
         return removed
