@@ -42,11 +42,10 @@ class BackupsView(discord.ui.View):
             lines: list[str] = []
             for entry in self.entries:
                 size_label = format_bytes(entry.size_bytes)
-                date_label = entry.created_at or _('Unknown')
                 lines.append(
                     f'📦 **{entry.name}**\n'
                     f'> `{_("Disk Usage")}:` {size_label}\n'
-                    f'> `{_("Date")}:` {date_label}'
+                    f'> `{_("Date")}:` {entry.created_at}'
                 )
             description = '\n\n'.join(lines)
 
@@ -124,7 +123,7 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
             )
         ]
         for entry in entries[:24]:
-            desc = f'{format_bytes(entry.size_bytes)} • {entry.created_at or _("Unknown")}'
+            desc = f'{format_bytes(entry.size_bytes)} • {entry.created_at}'
             options.append(
                 discord.SelectOption(
                     label=f'📦 {entry.name}'[:100],

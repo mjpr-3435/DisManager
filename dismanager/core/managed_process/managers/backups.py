@@ -20,7 +20,7 @@ class BackupEntry:
 
     name: str
     path: Path
-    created_at: str | None
+    created_at: str
     size_bytes: int
 
 
@@ -40,9 +40,6 @@ class BackupManager:
     def list_backups(self) -> list[BackupEntry]:
         """Return existing numbered backups, ordered 1..N."""
         root = self.backups_dir
-        if not root.is_dir():
-            return []
-
         indexed: list[tuple[int, Path]] = []
         prefix = f'{self._process_name} '
         with contextlib.suppress(OSError):
@@ -169,12 +166,6 @@ def _copy_tree_with_progress(
                 progress[0] += 1
 
 
-def _read_backup_timestamp(log_path: Path) -> str | None:
-    if not log_path.is_file():
-        return None
-    with contextlib.suppress(OSError):
-        text = log_path.read_text(encoding='utf-8').strip()
-        if text.startswith(_LOG_PREFIX):
-            return text.removeprefix(_LOG_PREFIX).strip() or None
-        return text or None
-    return None
+def _read_backup_timestamp(log_path: Path) -> str:
+    text = log_path.read_text(encoding='utf-8').strip()
+    return text.removeprefix(_LOG_PREFIX).strip()
