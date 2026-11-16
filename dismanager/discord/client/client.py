@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import asyncio
 import contextlib
 import logging
 import time
-from typing import Literal
 
 import discord
 from discord.ext import commands
@@ -12,7 +10,7 @@ from discord.ext import commands
 from ...core.bootstrap.config import DisManagerConfig
 from ...core.bootstrap.i18n import _
 from ...core.bootstrap.logs import LogSession
-from ...core.processes import ManagedProcess, ProcessConfig, ProcessDeleteRequest
+from ...core.processes import ManagedProcess
 from .commands import setup as setup_commands
 from .events import setup as setup_events
 from .managers import AddonManager, ConsoleManager, PanelManager, ProcessManager
@@ -67,28 +65,6 @@ class DisManagerClient(commands.Bot):
 
         self._panel_manager.start()
         self._console_manager.start()
-
-    # --- Internal Behaviour ---
-
-    def _refresh_panel(self) -> None:
-        """Signal the panel loop to refresh immediately."""
-        self._panel_manager.refresh()
-
-    def _emit_addon_event(self, event_name: str, *args: object) -> None:
-        """Schedule an addon event dispatch on the active event loop."""
-        try:
-            loop = asyncio.get_running_loop()
-        except RuntimeError:
-            return
-        loop.create_task(self._addons_manager.call_addons(event_name, *args))
-
-    def _on_processes_edit(
-        self,
-        event: Literal['new', 'update', 'delete'],
-        payload: ProcessConfig | ProcessDeleteRequest,
-    ) -> None:
-        """Persist process changes, update client state, and handle folder side effects."""
-        self._processes_manager.on_edit(event, payload)
 
     # --- Public API ---
     

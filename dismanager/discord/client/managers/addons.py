@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 from typing import TYPE_CHECKING, Any
 
@@ -24,6 +25,18 @@ class AddonManager:
     def __init__(self, client: DisManagerClient) -> None:
         self._client = client
         self._addons: dict[str, object] = {}
+    
+    # --- Internal Behaviour ---
+
+    async def _emit_and_wait(self, event_name: str, *args: Any) -> None:
+        """Dispatch a DisManager lifecycle or process event to addons that implement it."""
+        await dispatch_hook(
+            self._addons,
+            event_name,
+            *args,
+            on_error=lambda name, hook: self._client.report_error(f'Addon:{name}.{hook}'),
+        )
+
         
     # --- Internal API ---
 
@@ -62,7 +75,7 @@ class AddonManager:
                     print(_('     -> Unable to import {}').format(module_path.name))
                 await self._client.report_error(f'AddonImport:{addon_name}')
 
-        await self.call_addons('on_addons_load')
+        await self._emit_and_wait('on_addons_load')
         return len(self._addons)
 
     async def unload_addons(self) -> None:
@@ -70,17 +83,16 @@ class AddonManager:
         if not self._addons:
             return
 
-        await self.call_addons('on_addons_unload')
+        await self._emit_and_wait('on_addons_unload')
         await unload_extensions(
             self._addons,
             on_error=lambda name: self._client.report_error(f'Addon:{name}.unload'),
         )
 
-    async def call_addons(self, event_name: str, *args: Any) -> None:
-        """Dispatch a DisManager lifecycle or process event to addons that implement it."""
-        await dispatch_hook(
-            self._addons,
-            event_name,
-            *args,
-            on_error=lambda name, hook: self._client.report_error(f'Addon:{name}.{hook}'),
-        )
+    def emit(self, event_name: str, *args: object) -> None:
+        """Schedule an addon event dispatch on the active event loop."""
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._emit_and_wait(event_name, *args))

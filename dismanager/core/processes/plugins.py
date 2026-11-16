@@ -65,7 +65,7 @@ class PluginManager:
                 await self._client.report_error(f'PluginImport:{self._process.name}:{plugin_name}')
 
         await self.call_plugins('on_plugins_load')
-        self._client._emit_addon_event('on_plugins_load', self._process)
+        self._client._addons_manager.emit('on_plugins_load', self._process)
         return len(self._plugins)
 
     async def unload_plugins(self) -> None:
@@ -78,7 +78,7 @@ class PluginManager:
             self._plugins,
             on_error=lambda name: self._client.report_error(f'Plugin:{self._process.name}:{name}.unload'),
         )
-        self._client._emit_addon_event('on_plugins_unload', self._process)
+        self._client._addons_manager.emit('on_plugins_unload', self._process)
 
     async def call_plugins(self, event_name: str, *args: Any) -> None:
         """Dispatch a lifecycle or console-log event to active plugins of this process."""

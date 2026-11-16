@@ -31,7 +31,7 @@ class _BotEvents(commands.Cog):
         if after.name == _ERROR_THREAD_NAME or self.bot._processes_manager.get_config(thread_proc) is not None:
             with contextlib.suppress(discord.HTTPException):
                 await after.edit(archived=False)
-            self.bot._refresh_panel()
+            self.bot._panel_manager.refresh()
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:

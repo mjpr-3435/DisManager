@@ -141,7 +141,7 @@ class ManagedProcess:
         self._reader_thread.start()
         if loop is not None:
             loop.create_task(self._on_start_plugins())
-        self._client._emit_addon_event('on_process_start', self)
+        self._client._addons_manager.emit('on_process_start', self)
         return True
 
     async def reload_plugins(self) -> int:
@@ -171,7 +171,7 @@ class ManagedProcess:
         self._stop_requested = True
         if should_emit_stop:
             self.emit_plugin_event('on_process_stop')
-            self._client._emit_addon_event('on_process_stop', self)
+            self._client._addons_manager.emit('on_process_stop', self)
         return self.execute(self._config.stop_command)
 
     def kill(self) -> bool:
@@ -184,7 +184,7 @@ class ManagedProcess:
         self._stop_requested = True
         if should_emit_stop:
             self.emit_plugin_event('on_process_stop')
-            self._client._emit_addon_event('on_process_stop', self)
+            self._client._addons_manager.emit('on_process_stop', self)
         with contextlib.suppress(psutil.Error, OSError):
             parent = psutil.Process(proc.pid)
             children = parent.children(recursive=True)
@@ -314,7 +314,7 @@ class ManagedProcess:
     def _finish_relay(self, reason: str | None, crashed: bool) -> None:
         self._relay.finish(reason=reason)
         if crashed:
-            self._client._emit_addon_event('on_process_crash', self)
+            self._client._addons_manager.emit('on_process_crash', self)
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:

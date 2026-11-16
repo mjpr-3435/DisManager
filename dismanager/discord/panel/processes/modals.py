@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import discord
 
@@ -64,7 +64,6 @@ class ProcessFormModal(discord.ui.Modal):
         name = self._existing.name if self._existing is not None else (
             self._name_input.value if self._name_input is not None else ''
         )
-        event: Literal['new', 'update'] = 'update' if self._existing is not None else 'new'
         try:
             config = validate_process_data(
                 name=name,
@@ -72,7 +71,11 @@ class ProcessFormModal(discord.ui.Modal):
                 stop_command=self._stop_input.value,
                 blacklist=self._blacklist_input.value,
             )
-            self._processes_view.bot._on_processes_edit(event, config)
+            manager = self._processes_view.bot._processes_manager
+            if self._existing is not None:
+                manager.update(config)
+            else:
+                manager.create(config)
         except ProcessConfigError as exc:
             await interaction.response.send_message(f'✖ {exc}', ephemeral=True)
             return
@@ -107,7 +110,7 @@ class DeleteProcessModal(discord.ui.Modal):
 
         async def finalize_delete(confirm_interaction: discord.Interaction[Any]) -> None:
             try:
-                bot._on_processes_edit('delete', ProcessDeleteRequest(target_name, delete_files=delete_files))
+                bot._processes_manager.delete(ProcessDeleteRequest(target_name, delete_files=delete_files))
             except ProcessConfigError as exc:
                 await confirm_interaction.response.edit_message(content=f'✖ {exc}', embed=None, view=None)
                 return
