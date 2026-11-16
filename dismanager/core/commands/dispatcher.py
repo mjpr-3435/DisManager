@@ -25,17 +25,21 @@ async def run_process_action(
     prefix = client.config.bot_prefix if markdown else ''
     target = name.strip()
     if not target:
-        return False, _('Specify the process. E.g.: {0}{1}{2} <name>{0} or {0}{1}{2}-all{0}').format(
-            tick, prefix, action
+        return _format_result(
+            False,
+            _('Specify the process. E.g.: {0}{1}{2} <name>{0} or {0}{1}{2}-all{0}').format(
+                tick, prefix, action
+            ),
+            markdown=markdown,
         )
 
     process = client.find_process(target)
     if process is None:
         ref = f'`{target}`' if markdown else f"'{target}'"
-        return False, _('Process {} not found.').format(ref)
+        return _format_result(False, _('Process {} not found.').format(ref), markdown=markdown)
 
     ok, detail = await _execute_process_action(process, action)
-    return ok, f'{tick}[{process.name}]{tick}: {detail}'
+    return _format_result(ok, f'{tick}[{process.name}]{tick}: {detail}', markdown=markdown)
 
 
 async def run_all_processes_action(
@@ -47,7 +51,7 @@ async def run_all_processes_action(
     """Run ``action`` across all configured processes and return ``(ok, summary)``."""
     processes = client.processes
     if not processes:
-        return False, _('No processes configured.')
+        return _format_result(False, _('No processes configured.'), markdown=markdown)
 
     tick = '`' if markdown else ''
     lines: list[str] = []
@@ -57,26 +61,31 @@ async def run_all_processes_action(
         if ok:
             any_ok = True
         if ok or action == 'start':
-            if markdown:
-                marker = '✔' if ok else '✖'
-                lines.append(f'{marker} {tick}[{process.name}]{tick}: {detail}')
-            else:
-                lines.append(f'  [{process.name}]: {detail}')
+            _ok, line = _format_result(ok, f'{tick}[{process.name}]{tick}: {detail}', markdown=markdown)
+            lines.append(line if markdown else f'  {line}')
 
     if not lines:
-        return False, _('No eligible processes for {}.').format(action)
+        return _format_result(False, _('No eligible processes for {}.').format(action), markdown=markdown)
     return any_ok, '\n'.join(lines)
 
 
-async def reload_addons_command(client: DisManagerClient) -> tuple[bool, str]:
-    """Reload all DisManager addons and return ``(ok, message)``."""
+async def reload_addons_command(client: DisManagerClient, *, markdown: bool = False) -> str:
+    """Reload all DisManager addons and return the formatted status message."""
     count = await client.reload_addons()
-    return True, _('Reloaded {} addon(s).').format(count)
+    _ok, message = _format_result(True, _('Reloaded {} addon(s).').format(count), markdown=markdown)
+    return message
 
 
 # =========================================
 #            Internal Helpers
 # =========================================
+
+
+def _format_result(ok: bool, message: str, *, markdown: bool) -> tuple[bool, str]:
+    if not markdown:
+        return ok, message
+    marker = '✔' if ok else '✖'
+    return ok, f'{marker} {message}'
 
 
 async def _execute_process_action(process: ManagedProcess, action: ProcessAction) -> tuple[bool, str]:

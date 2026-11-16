@@ -54,7 +54,7 @@ class _BotEvents(commands.Cog):
             action = cast(ProcessAction, cmd)
             ok, feedback = await run_process_action(self.bot, action, target_name, markdown=True)
             if not ok:
-                await message.channel.send(f'✖ {feedback}', delete_after=5)
+                await message.channel.send(feedback, delete_after=5)
         elif cmd == 'logs':
             await process.send_logs()
         else:

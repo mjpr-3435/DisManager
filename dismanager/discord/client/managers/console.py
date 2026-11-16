@@ -93,8 +93,7 @@ class ConsoleManager:
             return False
 
         if cmd == 'adreload':
-            _ok, message = await reload_addons_command(self._client)
-            print(message)
+            print(await reload_addons_command(self._client))
             return True
 
         if cmd in ('start', 'stop', 'restart', 'kill', 'plreload'):

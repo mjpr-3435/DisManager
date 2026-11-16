@@ -85,8 +85,8 @@ class _BotCommands(commands.Cog):
             return
         with contextlib.suppress(discord.HTTPException):
             await ctx.message.delete()
-        _ok, message = await reload_addons_command(self.bot)
-        await ctx.send(f'✔ {message}', delete_after=2)
+        message = await reload_addons_command(self.bot, markdown=True)
+        await ctx.send(message, delete_after=2)
 
     async def _run_process_command(
         self,
@@ -101,8 +101,7 @@ class _BotCommands(commands.Cog):
             await ctx.message.delete()
 
         ok, message = await run_process_action(self.bot, action, name, markdown=True)
-        prefix = '✔' if ok else '✖'
-        await ctx.send(f'{prefix} {message}', delete_after=2 if ok else 5)
+        await ctx.send(message, delete_after=2 if ok else 5)
 
     async def _run_all_processes_command(
         self,
@@ -116,8 +115,6 @@ class _BotCommands(commands.Cog):
             await ctx.message.delete()
 
         ok, message = await run_all_processes_action(self.bot, action, markdown=True)
-        if not ok and '\n' not in message:
-            message = f'✖ {message}'
         await ctx.send(message, delete_after=3 if ok else 5)
 
 
