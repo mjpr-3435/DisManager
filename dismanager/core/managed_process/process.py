@@ -202,6 +202,10 @@ class ManagedProcess:
             return 0
         return await self._plugins.load_plugins(reload=True)
 
+    async def call_plugins(self, event_name: str, *args: object) -> None:
+        """Dispatch a custom or lifecycle event to active plugins of this process."""
+        await self._plugins.call_plugins(event_name, *args)
+
     # Console & Logs
 
     def add_log(self, log: str) -> None:
