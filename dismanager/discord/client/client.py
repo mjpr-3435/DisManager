@@ -15,10 +15,7 @@ from ...core.bootstrap.logs import LogSession
 from ...core.processes import ManagedProcess, ProcessConfig, ProcessDeleteRequest
 from .commands import setup as setup_commands
 from .events import setup as setup_events
-from .manager_addons import AddonManager
-from .manager_console import ConsoleManager
-from .manager_panel import PanelManager
-from .manager_processes import ProcessManager
+from .managers import AddonManager, ConsoleManager, PanelManager, ProcessManager
 
 _ERROR_NOTICE_COOLDOWN_SECONDS = 60.0
 

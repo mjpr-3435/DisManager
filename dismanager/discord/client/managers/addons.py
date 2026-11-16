@@ -3,9 +3,9 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any
 
-from ...core.bootstrap.i18n import _
-from ...core.bootstrap.paths import ADDONS_DIR
-from ...core.extensions import (
+from ....core.bootstrap.i18n import _
+from ....core.bootstrap.paths import ADDONS_DIR
+from ....core.extensions import (
     discover_extension_candidates,
     dispatch_hook,
     ensure_on_sys_path,
@@ -15,7 +15,7 @@ from ...core.extensions import (
 )
 
 if TYPE_CHECKING:
-    from .client import DisManagerClient
+    from ..client import DisManagerClient
 
 
 class AddonManager:

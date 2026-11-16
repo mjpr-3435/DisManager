@@ -3,12 +3,12 @@ from __future__ import annotations
 import asyncio
 from typing import TYPE_CHECKING
 
-from ...core.bootstrap.i18n import _
-from ...core.console import ProcessAction, build_console_handler, console_loop
-from ...core.processes import ProcessConfigError
+from ....core.bootstrap.i18n import _
+from ....core.console import ProcessAction, build_console_handler, console_loop
+from ....core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
-    from .client import DisManagerClient
+    from ..client import DisManagerClient
 
 
 class ConsoleManager:

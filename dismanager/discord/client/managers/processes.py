@@ -6,8 +6,8 @@ import shutil
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-from ...core.bootstrap.i18n import _
-from ...core.processes import (
+from ....core.bootstrap.i18n import _
+from ....core.processes import (
     ManagedProcess,
     ProcessConfig,
     ProcessConfigError,
@@ -18,7 +18,7 @@ from ...core.processes import (
 )
 
 if TYPE_CHECKING:
-    from .client import DisManagerClient
+    from ..client import DisManagerClient
 
 
 class ProcessManager:

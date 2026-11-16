@@ -9,12 +9,12 @@ from typing import TYPE_CHECKING
 import aiohttp
 import discord
 
-from ...core.bootstrap.i18n import _
-from ..panel import PanelView, update_panel
-from ..utils import get_or_create_thread
+from ....core.bootstrap.i18n import _
+from ...panel import PanelView, update_panel
+from ...utils import get_or_create_thread
 
 if TYPE_CHECKING:
-    from .client import DisManagerClient
+    from ..client import DisManagerClient
 
 _PANEL_REFRESH_SECONDS = 15
 _ERROR_THREAD_NAME = 'Error Reports'
