@@ -97,6 +97,8 @@ class ManagedProcess:
 
     # --- Public API ---
 
+    # Properties
+
     @property
     def name(self) -> str:
         """Return the configured name of this process."""
@@ -127,10 +129,12 @@ class ManagedProcess:
         """Return the per-process plugins directory."""
         return self._plugins.plugins_dir
 
+    # Lifecycle
+
     def is_running(self) -> bool:
         """Return ``True`` while the subprocess is alive or its Discord relay is still draining."""
         return self._runner.is_alive or self._relay.is_active
-    
+
     def start(self) -> bool:
         """Start the configured subprocess and begin reading its output."""
         if self.is_running():
@@ -147,12 +151,6 @@ class ManagedProcess:
             loop.create_task(self._on_start_plugins())
         self._client._addons_manager.emit('on_process_start', self)
         return True
-
-    async def reload_plugins(self) -> int:
-        """Reload per-process plugins when this process is running."""
-        if not self.is_running():
-            return 0
-        return await self._plugins.load_plugins(reload=True)
 
     def stop(self) -> bool:
         """Request a graceful stop via ``stop_command``, or fall back to ``kill()``."""
@@ -192,6 +190,20 @@ class ManagedProcess:
 
         return self.start()
 
+    def execute(self, command: str) -> bool:
+        """Write a command line to the subprocess stdin."""
+        return self._runner.execute(command)
+
+    # Plugins
+
+    async def reload_plugins(self) -> int:
+        """Reload per-process plugins when this process is running."""
+        if not self.is_running():
+            return 0
+        return await self._plugins.load_plugins(reload=True)
+
+    # Console & Logs
+
     def add_log(self, log: str) -> None:
         """Enqueue a log line into this process's Discord console relay."""
         self._relay.enqueue(log)
@@ -212,9 +224,7 @@ class ManagedProcess:
             return None
         return await thread.send(message)
 
-    def execute(self, command: str) -> bool:
-        """Write a command line to the subprocess stdin."""
-        return self._runner.execute(command)
+    # Metrics
 
     def ram_usage_bytes(self) -> int:
         """Return total RSS memory in bytes for the process tree."""
@@ -223,6 +233,8 @@ class ManagedProcess:
     def disk_usage_bytes(self) -> int:
         """Return total disk usage in bytes of this process's working directory."""
         return dir_size_bytes(self._config.resolve_path())
+
+    # Backups
 
     def list_backups(self) -> list[BackupEntry]:
         """Return existing numbered backups for this process, ordered 1..N."""
