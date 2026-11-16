@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import os
-import shutil
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,7 +8,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ...bootstrap.paths import BACKUPS_DIR
-from ...utils import dir_size_bytes
+from ...utils import (
+    clear_directory_contents,
+    copy_tree_with_progress,
+    count_files,
+    dir_size_bytes,
+    remove_path,
+)
 
 if TYPE_CHECKING:
     from ...bootstrap.config import DisManagerConfig
@@ -65,15 +69,15 @@ class BackupManager:
         backups_root = self.backups_dir
         backups_root.mkdir(parents=True, exist_ok=True)
 
-        total = _count_files(resolved_source) if on_progress is not None else 0
+        total = count_files(resolved_source) if on_progress is not None else 0
         if on_progress is not None:
             on_progress(0, total)
 
         _rotate_backups(backups_root, self._config.name, self._app_config.backups)
 
         target_dir = backups_root / f'{self._config.name} 1'
-        _remove_path(target_dir)
-        _copy_tree_with_progress(resolved_source, target_dir, on_progress, total=total)
+        remove_path(target_dir)
+        copy_tree_with_progress(resolved_source, target_dir, on_progress, total=total)
 
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         (target_dir / BACKUP_LOG_FILENAME).write_text(f'{_LOG_PREFIX}{timestamp}\n', encoding='utf-8')
@@ -85,14 +89,14 @@ class BackupManager:
         if not resolved_backup.is_dir():
             raise FileNotFoundError(f"Backup directory '{resolved_backup}' does not exist.")
 
-        total = _count_files(resolved_backup, exclude_name=BACKUP_LOG_FILENAME) if on_progress is not None else 0
+        total = count_files(resolved_backup, exclude_name=BACKUP_LOG_FILENAME) if on_progress is not None else 0
         if on_progress is not None:
             on_progress(0, total)
 
         resolved_target = self._config.resolve_path().resolve()
         resolved_target.mkdir(parents=True, exist_ok=True)
-        _clear_directory_contents(resolved_target)
-        _copy_tree_with_progress(
+        clear_directory_contents(resolved_target)
+        copy_tree_with_progress(
             resolved_backup,
             resolved_target,
             on_progress,
@@ -123,67 +127,14 @@ def _scan_backups(backups_root: Path, process_name: str, max_backups: int) -> li
     return indexed
 
 
-def _remove_path(path: Path) -> None:
-    if path.is_dir() and not path.is_symlink():
-        shutil.rmtree(path)
-    elif path.exists() or path.is_symlink():
-        path.unlink()
-
-
 def _rotate_backups(backups_root: Path, process_name: str, max_backups: int) -> None:
     for idx, path in reversed(_scan_backups(backups_root, process_name, max_backups)):
         if idx >= max_backups:
-            _remove_path(path)
+            remove_path(path)
         else:
             dest = backups_root / f'{process_name} {idx + 1}'
-            _remove_path(dest)
+            remove_path(dest)
             path.rename(dest)
-
-
-def _clear_directory_contents(directory: Path) -> None:
-    for child in directory.iterdir():
-        if child.is_dir() and not child.is_symlink():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
-
-
-def _count_files(directory: Path, *, exclude_name: str | None = None) -> int:
-    total = 0
-    for root, _, files in os.walk(directory):
-        is_root = Path(root) == directory
-        for filename in files:
-            if is_root and exclude_name is not None and filename == exclude_name:
-                continue
-            total += 1
-    return total
-
-
-def _copy_tree_with_progress(
-    source_dir: Path,
-    target_dir: Path,
-    on_progress: Callable[[int, int], None] | None,
-    *,
-    total: int,
-    exclude_name: str | None = None,
-) -> None:
-    copied = 0
-    target_dir.mkdir(parents=True, exist_ok=True)
-    for root, dirs, files in os.walk(source_dir):
-        rel = Path(root).relative_to(source_dir)
-        dest_root = target_dir / rel
-        dest_root.mkdir(parents=True, exist_ok=True)
-        for dirname in dirs:
-            (dest_root / dirname).mkdir(exist_ok=True)
-
-        is_root = rel == Path('.')
-        for filename in files:
-            if is_root and exclude_name is not None and filename == exclude_name:
-                continue
-            shutil.copy2(Path(root) / filename, dest_root / filename)
-            copied += 1
-            if on_progress is not None:
-                on_progress(copied, total)
 
 
 def _read_backup_timestamp(log_path: Path) -> str:
