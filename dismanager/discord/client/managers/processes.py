@@ -47,7 +47,6 @@ class ProcessManager:
             except OSError:
                 await self._client.report_error(f'DeleteProcess:{target_dir.name}')
 
-
     # --- Internal API ---
 
     def load(self) -> None:
