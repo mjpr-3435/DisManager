@@ -40,6 +40,7 @@ class ManagedProcess:
         self._plugins = PluginManager(self, client)
         process_backups_dir(config.name).mkdir(parents=True, exist_ok=True)
         self._plugins.plugins_dir.mkdir(parents=True, exist_ok=True)
+        asyncio.create_task(self.ensure_console_thread())
 
     @property
     def name(self) -> str:
@@ -70,7 +71,7 @@ class ManagedProcess:
         return make_backup(
             self.name,
             self._config.resolve_path(),
-            self._client.max_backups,
+            self._client._config.backups,
             progress,
         )
 
@@ -141,7 +142,7 @@ class ManagedProcess:
         self._reader_thread.start()
         if loop is not None:
             loop.create_task(self._on_start_plugins())
-        self._client.emit_addon_event('on_process_start', self)
+        self._client._emit_addon_event('on_process_start', self)
         return True
 
     async def reload_plugins(self) -> int:
@@ -168,7 +169,7 @@ class ManagedProcess:
         self._stop_requested = True
         if should_emit_stop:
             self.emit_plugin_event('on_process_stop')
-            self._client.emit_addon_event('on_process_stop', self)
+            self._client._emit_addon_event('on_process_stop', self)
         if self._config.stop_command:
             return self.execute(self._config.stop_command)
 
@@ -189,7 +190,7 @@ class ManagedProcess:
         self._stop_requested = True
         if should_emit_stop:
             self.emit_plugin_event('on_process_stop')
-            self._client.emit_addon_event('on_process_stop', self)
+            self._client._emit_addon_event('on_process_stop', self)
         with contextlib.suppress(psutil.Error, OSError):
             parent = psutil.Process(proc.pid)
             children = parent.children(recursive=True)
@@ -216,6 +217,10 @@ class ManagedProcess:
             await self._relay.shutdown()
 
         return self.start()
+
+    async def ensure_console_thread(self) -> None:
+        """Ensure this process's ``Console <name>`` Discord thread exists."""
+        await self._relay.ensure_thread()
 
     async def send_logs(self) -> None:
         """Send this process's recent 8 MB log buffer to its Discord console thread."""
@@ -315,7 +320,7 @@ class ManagedProcess:
     def _finish_relay(self, reason: str | None, crashed: bool) -> None:
         self._relay.finish(reason=reason)
         if crashed:
-            self._client.emit_addon_event('on_process_crash', self)
+            self._client._emit_addon_event('on_process_crash', self)
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:

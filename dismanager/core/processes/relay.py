@@ -86,7 +86,7 @@ class ConsoleRelay:
 
     async def send_log_file(self, data: bytes) -> discord.Message | None:
         """Send the process's recent 8 MB log buffer as a ``.log`` attachment."""
-        thread = await self._resolve_thread()
+        thread = await self.ensure_thread()
         if thread is None:
             return None
         if not data:
@@ -94,18 +94,19 @@ class ConsoleRelay:
         file = discord.File(io.BytesIO(data), filename=f'{self.name}.log')
         return await thread.send(file=file)
 
-    # =========================================
-    #            Internal Helpers
-    # =========================================
-
-    async def _resolve_thread(self) -> discord.Thread | None:
-        panel = self._client.panel
+    async def ensure_thread(self) -> discord.Thread | None:
+        """Ensure the ``Console <name>`` thread exists under the panel channel."""
+        panel = self._client._panel_manager.channel
         if panel is None:
             return None
         return await get_or_create_thread(panel, f'Console {self.name}')
 
+    # =========================================
+    #            Internal Helpers
+    # =========================================
+
     async def _run(self, queue: asyncio.Queue[str | None]) -> None:
-        thread = await self._resolve_thread()
+        thread = await self.ensure_thread()
         if thread is None:
             return
 
@@ -137,7 +138,7 @@ class ConsoleRelay:
             except (aiohttp.ClientError, discord.HTTPException):
                 await asyncio.sleep(1.0)
                 with contextlib.suppress(Exception):
-                    refetched = await self._resolve_thread()
+                    refetched = await self.ensure_thread()
                     if refetched is not None:
                         thread = refetched
             except asyncio.CancelledError:

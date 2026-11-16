@@ -60,7 +60,7 @@ class BackupsView(discord.ui.View):
             description=description,
             color=0x2B2D31,
         )
-        embed.set_footer(text=self.bot._('Max backups: {}').format(self.bot.max_backups))
+        embed.set_footer(text=self.bot._('Max backups: {}').format(self.bot._config.backups))
         return embed
 
     async def refresh(self, interaction: discord.Interaction[Any], *, message_id: int | None = None) -> None:

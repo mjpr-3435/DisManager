@@ -25,9 +25,14 @@ class ProcessManager:
 
     def __init__(self, client: DisManagerClient) -> None:
         self._client = client
-        self.configs: list[ProcessConfig] = load_processes()
-        self._processes: dict[str, ManagedProcess] = {
-            proc.name: ManagedProcess(proc, client) for proc in self.configs
+        self.configs: list[ProcessConfig] = []
+        self._processes: dict[str, ManagedProcess] = {}
+
+    def load(self) -> None:
+        """Load process configurations and instantiate managed processes."""
+        self.configs = load_processes()
+        self._processes = {
+            proc.name: ManagedProcess(proc, self._client) for proc in self.configs
         }
 
     def list_processes(self) -> list[ManagedProcess]:
@@ -70,10 +75,7 @@ class ProcessManager:
                 payload.resolve_path().mkdir(parents=True, exist_ok=True)
             except OSError as exc:
                 raise ProcessConfigError(f"Could not create process folder '{payload.name}': {exc}") from exc
-            if self._client.panel is not None:
-                asyncio.create_task(self._client.ensure_console_thread(payload.name))
-            else:
-                self._client.refresh_panel()
+            self._client._refresh_panel()
             return
 
         if event == 'update':
@@ -82,7 +84,7 @@ class ProcessManager:
             process = self._processes.get(payload.name)
             if process is not None:
                 process.update_config(payload)
-            self._client.refresh_panel()
+            self._client._refresh_panel()
             return
 
         if event == 'delete':
@@ -98,7 +100,7 @@ class ProcessManager:
                     target_dir = candidate_dir
             if process is not None or target_dir is not None:
                 asyncio.create_task(self._cleanup_deleted_process(process, target_dir))
-            self._client.refresh_panel()
+            self._client._refresh_panel()
             return
 
         raise ValueError(f'Unsupported process edit event: {event}')

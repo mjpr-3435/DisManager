@@ -22,15 +22,16 @@ class _BotCommands(commands.Cog):
 
     @commands.command(name='log')
     async def log_command(self, ctx: commands.Context[DisManagerClient]) -> None:
-        if self.bot.error_thread is None or ctx.channel.id != self.bot.error_thread.id:
+        error_thread = self.bot._panel_manager.error_thread
+        if error_thread is None or ctx.channel.id != error_thread.id:
             return
 
-        data = self.bot.log_session.recent_bytes()
+        data = self.bot._log_session.recent_bytes()
         if not data:
             await ctx.send(self.bot._('The log file is currently empty.'))
             return
 
-        file = discord.File(io.BytesIO(data), filename=self.bot.log_session.filename)
+        file = discord.File(io.BytesIO(data), filename=self.bot._log_session.filename)
         await ctx.send(file=file)
 
     @commands.command(name='start')
@@ -51,7 +52,7 @@ class _BotCommands(commands.Cog):
 
     @commands.command(name='plreload')
     async def plreload_command(self, ctx: commands.Context[DisManagerClient], *, name: str = '') -> None:
-        if self.bot.panel is None or ctx.channel.id != self.bot.panel.id:
+        if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
             return
         with contextlib.suppress(discord.HTTPException):
             await ctx.message.delete()
@@ -59,12 +60,12 @@ class _BotCommands(commands.Cog):
         if target is not None and self.bot.find_process(target) is None:
             await ctx.send(self.bot._('✖ Process `{}` not found.').format(target), delete_after=3)
             return
-        count = await self.bot.reload_plugins(target)
+        count = await self.bot._processes_manager.reload_plugins(target)
         await ctx.send(self.bot._('✔ Reloaded {} plugin(s).').format(count), delete_after=2)
 
     @commands.command(name='adreload')
     async def adreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:
-        if self.bot.panel is None or ctx.channel.id != self.bot.panel.id:
+        if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
             return
         with contextlib.suppress(discord.HTTPException):
             await ctx.message.delete()
@@ -77,7 +78,7 @@ class _BotCommands(commands.Cog):
         action: Literal['start', 'stop', 'kill', 'restart'],
         name: str,
     ) -> None:
-        if self.bot.panel is None or ctx.channel.id != self.bot.panel.id:
+        if self.bot._panel_manager.channel is None or ctx.channel.id != self.bot._panel_manager.channel.id:
             return
 
         with contextlib.suppress(discord.HTTPException):

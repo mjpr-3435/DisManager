@@ -27,7 +27,7 @@ class ConsoleManager:
             self._client._,
             self._client.close,
             self._client.reload_addons,
-            self._client.reload_plugins,
+            self._client._processes_manager.reload_plugins,
             self._process_action,
             self._status,
         )
@@ -71,7 +71,7 @@ class ConsoleManager:
         return self._client._('[{}]: Restarting process.').format(process.name)
 
     def _status(self) -> str:
-        processes = self._client.processes.list_processes()
+        processes = self._client.processes
         if not processes:
             return self._client._('No processes configured.')
 

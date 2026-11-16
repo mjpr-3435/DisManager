@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 import discord
@@ -23,7 +24,7 @@ class ProcessesConfigView(discord.ui.View):
     def render(self) -> discord.Embed:
         """Rebuild controls from the client's process list and return the embed."""
         self.clear_items()
-        processes = self.bot.processes_config
+        processes = self.bot._processes_manager.configs
 
         if processes:
             self.add_item(_ProcessSelect(self.bot, processes))
@@ -51,7 +52,7 @@ class ProcessesConfigView(discord.ui.View):
 
 
 class _ProcessSelect(discord.ui.Select[ProcessesConfigView]):
-    def __init__(self, bot: DisManagerClient, processes: list[ProcessConfig]) -> None:
+    def __init__(self, bot: DisManagerClient, processes: Sequence[ProcessConfig]) -> None:
         options = [
             discord.SelectOption(label=proc.name[:100], value=proc.name)
             for proc in processes[:MAX_PROCESSES]
@@ -60,7 +61,7 @@ class _ProcessSelect(discord.ui.Select[ProcessesConfigView]):
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        existing = self.view.bot.get_process_config(self.values[0])
+        existing = self.view.bot._processes_manager.get_config(self.values[0])
         if existing is None:
             await self.view.refresh(interaction)
             return
@@ -83,7 +84,7 @@ class _DeleteProcessButton(discord.ui.Button[ProcessesConfigView]):
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        processes = self.view.bot.processes_config
+        processes = self.view.bot._processes_manager.configs
         if not processes:
             await self.view.refresh(interaction)
             return
