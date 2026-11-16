@@ -12,8 +12,8 @@ from typing import Any
 
 import psutil
 
-from ...bootstrap.logs import ByteRingBuffer, SessionLogWriter
 from ...bootstrap.paths import LOGS_DIR
+from ...logs import ByteRingBuffer, SessionLogWriter
 from ...process_store import ProcessConfig, ProcessConfigError
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;?]*[a-zA-Z]')
