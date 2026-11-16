@@ -196,6 +196,15 @@ class ManagedProcess:
         """Enqueue a log line into this process's Discord console relay."""
         self._relay.enqueue(log)
 
+    def last_logs(self, *, limit: int = 40) -> list[str]:
+        """Return up to the last ``limit`` log lines from the recent 8 MB buffer."""
+        if limit <= 0:
+            return []
+        raw = self._runner.recent_log_bytes()
+        if not raw:
+            return []
+        return raw.decode('utf-8', errors='replace').splitlines()[-limit:]
+
     async def send_to_console(self, message: str) -> discord.Message | None:
         """Send a message directly to this process's Discord console thread."""
         thread = await self._relay.ensure_thread()
