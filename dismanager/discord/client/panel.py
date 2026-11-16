@@ -33,39 +33,7 @@ class PanelManager:
         self._task          = None
         self._refresh_event = asyncio.Event()
 
-    async def validate_channel(self) -> bool:
-        """Validate the configured panel channel and initialize its Error Reports thread."""
-        channel = self._resolve_channel()
-        if channel is None:
-            return False
-        self.channel = channel
-        self.error_thread = await get_or_create_thread(channel, _ERROR_THREAD_NAME)
-        return True
-
-    def start(self) -> None:
-        """Start the background panel refresh loop."""
-        self._task = asyncio.create_task(self._loop())
-
-    def refresh(self) -> None:
-        """Trigger an immediate panel refresh."""
-        self._refresh_event.set()
-
-    async def ensure_error_thread(self) -> discord.Thread | None:
-        """Return the Error Reports thread, creating it if needed."""
-        if self.error_thread is None and self.channel is not None:
-            with contextlib.suppress(Exception):
-                self.error_thread = await get_or_create_thread(self.channel, _ERROR_THREAD_NAME)
-        return self.error_thread
-
-    async def close(self) -> None:
-        """Cancel the panel loop and mark the panel message offline."""
-        if self._task is not None:
-            self._task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._task
-        await self._mark_offline()
-
-    # --- Internal Helpers ---
+    # --- Internal Behaviour ---
 
     def _resolve_channel(self) -> discord.TextChannel | None:
         panel_id = self._client._config.panel_id
@@ -128,3 +96,37 @@ class PanelManager:
             await message.edit(embed=embed)
         except Exception as exc:
             self._client._logger.warning('Failed to mark panel offline: %s', exc)
+
+    # --- Internal API ---
+
+    async def ensure_error_thread(self) -> discord.Thread | None:
+        """Return the Error Reports thread, creating it if needed."""
+        if self.error_thread is None and self.channel is not None:
+            with contextlib.suppress(Exception):
+                self.error_thread = await get_or_create_thread(self.channel, _ERROR_THREAD_NAME)
+        return self.error_thread
+    
+    async def validate_channel(self) -> bool:
+        """Validate the configured panel channel and initialize its Error Reports thread."""
+        channel = self._resolve_channel()
+        if channel is None:
+            return False
+        self.channel = channel
+        self.error_thread = await get_or_create_thread(channel, _ERROR_THREAD_NAME)
+        return True
+
+    def start(self) -> None:
+        """Start the background panel refresh loop."""
+        self._task = asyncio.create_task(self._loop())
+
+    def refresh(self) -> None:
+        """Trigger an immediate panel refresh."""
+        self._refresh_event.set()
+
+    async def close(self) -> None:
+        """Cancel the panel loop and mark the panel message offline."""
+        if self._task is not None:
+            self._task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._task
+        await self._mark_offline()
