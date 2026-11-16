@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal
 import discord
 from discord.ext import commands
 
-from ..core.processes import ProcessConfigError
+from ...core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
     from .client import DisManagerClient

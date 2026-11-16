@@ -11,7 +11,7 @@ import discord
 import psutil
 
 from ...core.i18n import Translator
-from ...processes import ManagedProcess
+from ...core.processes import ManagedProcess
 from ..files.embed import format_bytes
 
 

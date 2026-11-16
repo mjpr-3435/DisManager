@@ -14,7 +14,7 @@ from ..utils import confirmation_request
 from .embed import format_bytes, to_dismanager_path
 
 if TYPE_CHECKING:
-    from ...processes import ManagedProcess
+    from ...core.processes import ManagedProcess
     from ..client import DisManagerClient
     from .views import FilesView
 

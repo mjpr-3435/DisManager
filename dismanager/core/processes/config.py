@@ -7,7 +7,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from .paths import DATA_DIR
+from ..paths import DATA_DIR
 
 _PROCESSES_FILE = DATA_DIR / 'processes.json'
 MAX_PROCESSES = 15

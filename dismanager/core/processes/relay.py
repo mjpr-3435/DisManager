@@ -10,10 +10,10 @@ from typing import TYPE_CHECKING
 import aiohttp
 import discord
 
-from ..discord.utils import get_or_create_thread
+from ...discord.utils import get_or_create_thread
 
 if TYPE_CHECKING:
-    from ..discord.client import DisManagerClient
+    from ...discord.client import DisManagerClient
 
 _RELAY_QUEUE_MAXSIZE = 1000
 _RELAY_MESSAGE_LIMIT = 1990

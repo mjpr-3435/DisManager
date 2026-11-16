@@ -13,15 +13,15 @@ from typing import TYPE_CHECKING, Any
 
 import psutil
 
-from ..core.backups import make_backup, process_backups_dir, restore_backup
-from ..core.logs import ByteRingBuffer, SessionLogWriter
-from ..core.paths import LOGS_DIR
-from ..core.processes import ProcessConfig, ProcessConfigError
+from ..backups import make_backup, process_backups_dir, restore_backup
+from ..logs import ByteRingBuffer, SessionLogWriter
+from ..paths import LOGS_DIR
+from .config import ProcessConfig, ProcessConfigError
 from .plugins import PluginManager
 from .relay import ConsoleRelay
 
 if TYPE_CHECKING:
-    from ..discord.client import DisManagerClient
+    from ...discord.client import DisManagerClient
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;?]*[a-zA-Z]')
 

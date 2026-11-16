@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 from typing import TYPE_CHECKING, Any, Protocol
 
-from ..core.extensions import (
+from ...core.extensions import (
     discover_extension_candidates,
     dispatch_hook,
     ensure_on_sys_path,
@@ -11,11 +11,11 @@ from ..core.extensions import (
     purge_modules_under,
     unload_extensions,
 )
-from ..core.paths import ADDONS_DIR
+from ...core.paths import ADDONS_DIR
 
 if TYPE_CHECKING:
-    from ..discord.client import DisManagerClient
-    from ..processes import ManagedProcess
+    from ...core.processes import ManagedProcess
+    from .client import DisManagerClient
 
 
 class AddonProtocol(Protocol):
