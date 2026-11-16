@@ -16,7 +16,7 @@ from ..addons import AddonManager
 from ..core.config import DisManagerConfig
 from ..core.console import ProcessAction, build_console_handler, console_loop
 from ..core.i18n import Translator
-from ..core.logs import mute_console_logging
+from ..core.logs import LogSession
 from ..core.processes import (
     ProcessConfig,
     ProcessConfigError,
@@ -38,10 +38,16 @@ _ERROR_NOTICE_COOLDOWN_SECONDS = 60.0
 class DisManagerClient(commands.Bot):
     """Discord bot client for DisManager."""
 
-    def __init__(self, config: DisManagerConfig, translator: Translator) -> None:
+    def __init__(
+        self,
+        config: DisManagerConfig,
+        translator: Translator,
+        log_session: LogSession,
+    ) -> None:
         super().__init__(command_prefix=config.bot_prefix, intents=discord.Intents.all())
         self._config = config
         self._ = translator
+        self._log_session = log_session
         self._logger = logging.getLogger(__name__)
         self.processes_config: list[ProcessConfig] = load_processes()
         self._processes: dict[str, ManagedProcess] = {
@@ -62,6 +68,11 @@ class DisManagerClient(commands.Bot):
     @property
     def max_backups(self) -> int:
         return self._config.backups
+
+    @property
+    def log_session(self) -> LogSession:
+        """Return the active logging session for this execution."""
+        return self._log_session
 
     # --- Discord Hooks ---
 
@@ -84,7 +95,7 @@ class DisManagerClient(commands.Bot):
         self._ready_once = True
         print(self._('Logged in as {}!').format(self.user))
         await self.addons.load_addons(reload=False)
-        mute_console_logging()
+        self._log_session.mute_console()
 
         header = (
             f"{self._('Commands')}: "
