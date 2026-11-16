@@ -96,6 +96,14 @@ class DisManagerClient(commands.Bot):
     def processes(self) -> tuple[ManagedProcess, ...]:
         """Return a read-only snapshot of all managed processes."""
         return tuple(self._processes_manager.list_processes())
+    
+    def find_process(self, name: str) -> ManagedProcess | None:
+        """Return a managed process matching ``name`` case-insensitively."""
+        return self._processes_manager.find(name)
+
+    def restart_requested(self) -> bool:
+        """Return whether the client closed due to a restart request."""
+        return self._should_restart
 
     async def close(self) -> None:
         """Shut down background tasks and close the Discord connection."""
@@ -112,14 +120,14 @@ class DisManagerClient(commands.Bot):
         await self._panel_manager.close()
         await super().close()
 
-    def restart_requested(self) -> bool:
-        """Return whether the client closed due to a restart request."""
-        return self._should_restart
-
     async def request_restart(self) -> None:
         """Shut down via the unified close flow and signal the runner to relaunch."""
         self._should_restart = True
         await self.close()
+
+    async def reload_addons(self) -> int:
+        """Unload, purge cached addon modules, and reload all addons."""
+        return await self._addons_manager.load_addons(reload=True)
 
     async def report_error(self, context: str) -> None:
         """Log the active exception traceback to file and send a rate-limited notice to Error Reports."""
@@ -138,11 +146,3 @@ class DisManagerClient(commands.Bot):
             )
             with contextlib.suppress(Exception):
                 await error_thread.send(f'⚠ **[{context}]** {notice}')
-
-    def find_process(self, name: str) -> ManagedProcess | None:
-        """Return a managed process matching ``name`` case-insensitively."""
-        return self._processes_manager.find(name)
-
-    async def reload_addons(self) -> int:
-        """Unload, purge cached addon modules, and reload all addons."""
-        return await self._addons_manager.load_addons(reload=True)

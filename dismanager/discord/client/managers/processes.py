@@ -49,13 +49,6 @@ class ProcessManager:
 
     # --- Internal API ---
 
-    def load(self) -> None:
-        """Load process configurations and instantiate managed processes."""
-        self.configs = load_processes()
-        self._processes = {
-            proc.name.casefold(): ManagedProcess(proc, self._client) for proc in self.configs
-        }
-
     def list_processes(self) -> list[ManagedProcess]:
         """Return all managed process instances."""
         return list(self._processes.values())
@@ -68,6 +61,13 @@ class ProcessManager:
     def find(self, name: str) -> ManagedProcess | None:
         """Return a managed process matching ``name`` case-insensitively."""
         return self._processes.get(name.strip().casefold())
+
+    def load(self) -> None:
+        """Load process configurations and instantiate managed processes."""
+        self.configs = load_processes()
+        self._processes = {
+            proc.name.casefold(): ManagedProcess(proc, self._client) for proc in self.configs
+        }
 
     async def reload_plugins(self, process_name: str | None = None) -> int:
         """Reload per-process plugins for ``process_name`` or all active processes."""
