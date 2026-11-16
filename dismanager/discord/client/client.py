@@ -11,8 +11,7 @@ from ...core.bootstrap.config import DisManagerConfig
 from ...core.bootstrap.i18n import _
 from ...core.bootstrap.logs import LogSession
 from ...core.processes import ManagedProcess
-from .commands import setup as setup_commands
-from .events import setup as setup_events
+from .cogs import setup as setup_cogs
 from .managers import AddonManager, ConsoleManager, PanelManager, ProcessManager
 
 _ERROR_NOTICE_COOLDOWN_SECONDS = 60.0
@@ -46,8 +45,7 @@ class DisManagerClient(commands.Bot):
     # --- Discord Hooks ---
 
     async def setup_hook(self) -> None:
-        await setup_commands(self)
-        await setup_events(self)
+        await setup_cogs(self)
 
     async def on_ready(self) -> None:
         if self._ready_once:

@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING
 import discord
 from discord.ext import commands
 
-from ...core.bootstrap.i18n import _
-from ...core.processes import ProcessConfigError
+from ....core.bootstrap.i18n import _
+from ....core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
-    from .client import DisManagerClient
+    from ..client import DisManagerClient
 
 _ERROR_THREAD_NAME = 'Error Reports'
 

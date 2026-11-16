@@ -8,12 +8,12 @@ from typing import TYPE_CHECKING, Literal
 import discord
 from discord.ext import commands
 
-from ...core.bootstrap.i18n import _
-from ...core.processes import ProcessConfigError
+from ....core.bootstrap.i18n import _
+from ....core.processes import ProcessConfigError
 
 if TYPE_CHECKING:
-    from ...core.processes import ManagedProcess
-    from .client import DisManagerClient
+    from ....core.processes import ManagedProcess
+    from ..client import DisManagerClient
 
 
 class _BotCommands(commands.Cog):
