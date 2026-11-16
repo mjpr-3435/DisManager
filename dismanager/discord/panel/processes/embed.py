@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import discord
 
 from ....core.bootstrap.i18n import _
-from ....core.processes import MAX_PROCESSES, ProcessConfig
+from ....core.process_store import MAX_PROCESSES, ProcessConfig
 
 
 def build_processes_embed(processes: Sequence[ProcessConfig]) -> discord.Embed:

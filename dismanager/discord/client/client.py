@@ -10,7 +10,7 @@ from discord.ext import commands
 from ...core.bootstrap.config import DisManagerConfig
 from ...core.bootstrap.i18n import _
 from ...core.bootstrap.logs import LogSession
-from ...core.processes import ManagedProcess
+from ...core.managed_process import ManagedProcess
 from .cogs import setup as setup_cogs
 from .managers import AddonManager, ConsoleManager, PanelManager, ProcessManager
 

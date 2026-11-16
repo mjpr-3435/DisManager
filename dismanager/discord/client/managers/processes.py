@@ -6,7 +6,8 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal
 
 from ....core.bootstrap.i18n import _
-from ....core.processes import ManagedProcess, ProcessConfig, ProcessStore
+from ....core.managed_process import ManagedProcess
+from ....core.process_store import ProcessConfig, ProcessStore
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient

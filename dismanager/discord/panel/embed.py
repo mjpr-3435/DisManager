@@ -11,7 +11,7 @@ import discord
 import psutil
 
 from ...core.bootstrap.i18n import _
-from ...core.processes import ManagedProcess
+from ...core.managed_process import ManagedProcess
 from .files.embed import format_bytes
 
 if TYPE_CHECKING:

@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING, Any, Literal
 import discord
 
 from ....core.bootstrap.i18n import _
-from ....core.processes import ProcessConfigError
+from ....core.process_store import ProcessConfigError
 from ...utils import confirmation_request
 
 if TYPE_CHECKING:
-    from ....core.processes import ProcessConfig
+    from ....core.process_store import ProcessConfig
     from .views import ProcessesConfigView
 
 

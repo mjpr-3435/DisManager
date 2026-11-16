@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .core.processes import ManagedProcess
+from .core.managed_process import ManagedProcess
 from .discord.client import DisManagerClient
 
 

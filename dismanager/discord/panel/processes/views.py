@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 import discord
 
 from ....core.bootstrap.i18n import _
-from ....core.processes import MAX_PROCESSES, ProcessConfig
+from ....core.process_store import MAX_PROCESSES, ProcessConfig
 from .embed import build_processes_embed
 from .modals import DeleteProcessModal, ProcessFormModal
 

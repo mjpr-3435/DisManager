@@ -9,10 +9,10 @@ import discord
 from discord.ext import commands
 
 from ....core.bootstrap.i18n import _
-from ....core.processes import ProcessConfigError
+from ....core.process_store import ProcessConfigError
 
 if TYPE_CHECKING:
-    from ....core.processes import ManagedProcess
+    from ....core.managed_process import ManagedProcess
     from ..client import DisManagerClient
 
 
