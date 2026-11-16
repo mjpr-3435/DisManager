@@ -12,10 +12,9 @@ import discord
 
 from ....discord.utils import get_or_create_thread
 from ...bootstrap.i18n import _
-from ...process_store import ProcessConfig
 
 if TYPE_CHECKING:
-    from ....discord.client import DisManagerClient
+    from ..process import ManagedProcess
 
 _RELAY_QUEUE_MAXSIZE = 1000
 _RELAY_MESSAGE_LIMIT = 1990
@@ -24,10 +23,10 @@ _RELAY_MESSAGE_LIMIT = 1990
 class ConsoleRelay:
     """Async Discord thread relay with bounded queue, batching, and omission notices."""
 
-    def __init__(self, config: ProcessConfig, client: DisManagerClient) -> None:
-        self._config = config
-        self.name = config.name
-        self._client = client
+    def __init__(self, process: ManagedProcess) -> None:
+        self._process = process
+        self.name = process.name
+        self._client = process.client
         self._queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_RELAY_QUEUE_MAXSIZE)
         self._omitted_logs = 0
         self._task: asyncio.Task[None] | None = None
@@ -56,15 +55,11 @@ class ConsoleRelay:
         queue = self._queue
         self._task = asyncio.create_task(self._run(queue), name=f'console-relay-{self.name}')
 
-    def update_config(self, config: ProcessConfig) -> None:
-        """Update the active process configuration (including blacklist filters)."""
-        self._config = config
-
     def enqueue(self, line: str) -> None:
         """Push a log line into the bounded relay queue, skipping blacklisted lines."""
         if self._finished:
             return
-        if any(term in line for term in self._config.blacklist):
+        if any(term in line for term in self._process._config.blacklist):
             return
 
         try:

@@ -26,11 +26,11 @@ class ManagedProcess:
         self._client = client
 
         # Internal managers
-        self._runner    = ProcessRunner(config, on_line=self._on_raw_line, on_exit=self._on_process_exit)
-        self._logger    = ProcessLogger(config)
-        self._relay     = ConsoleRelay(config, client)
-        self._plugins   = PluginManager(self, client)
-        self._backups   = BackupManager(config, client.config)
+        self._runner    = ProcessRunner(self)
+        self._logger    = ProcessLogger(self)
+        self._relay     = ConsoleRelay(self)
+        self._plugins   = PluginManager(self)
+        self._backups   = BackupManager(self)
         self._loop      = None
 
         config.resolve_path().mkdir(parents=True, exist_ok=True)
@@ -79,9 +79,6 @@ class ManagedProcess:
     def _update_config(self, config: ProcessConfig) -> None:
         """Update process configuration in-place."""
         self._config = config
-        self._runner.update_config(config)
-        self._logger.update_config(config)
-        self._relay.update_config(config)
 
     async def _delete_folder(self) -> None:
         """Safely delete the process working directory if it resides under the workspace root."""

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import re
+from typing import TYPE_CHECKING
 
 from ...bootstrap.paths import LOGS_DIR
 from ...logs import ByteRingBuffer, SessionLogWriter
-from ...process_store import ProcessConfig
+
+if TYPE_CHECKING:
+    from ..process import ManagedProcess
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;?]*[a-zA-Z]')
 
@@ -14,22 +17,18 @@ class ProcessLogger:
 
     _session_log: SessionLogWriter | None
 
-    def __init__(self, config: ProcessConfig) -> None:
-        self._config = config
+    def __init__(self, process: ManagedProcess) -> None:
+        self._process = process
         self._buffer = ByteRingBuffer()
         self._session_log = None
 
     # --- Internal API ---
 
-    def update_config(self, config: ProcessConfig) -> None:
-        """Update the active process configuration."""
-        self._config = config
-
     def start_session(self) -> None:
         """Clear the recent RAM buffer and open a new rotating session log file."""
         self.close_session()
         self._buffer.clear()
-        self._session_log = SessionLogWriter(LOGS_DIR / 'processes' / self._config.name)
+        self._session_log = SessionLogWriter(LOGS_DIR / 'processes' / self._process.name)
 
     def record_line(self, raw_line: str) -> str | None:
         """Strip ANSI codes and persist a decoded stdout line; return ``None`` if blank."""

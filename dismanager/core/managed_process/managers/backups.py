@@ -17,8 +17,7 @@ from ...utils import (
 )
 
 if TYPE_CHECKING:
-    from ...bootstrap.config import DisManagerConfig
-    from ...process_store import ProcessConfig
+    from ..process import ManagedProcess
 
 BACKUP_LOG_FILENAME = 'backup_log.txt'
 _LOG_PREFIX = 'Backup created on: '
@@ -37,19 +36,18 @@ class BackupEntry:
 class BackupManager:
     """Manages rotating backups under ``.backups/<process_name>``."""
 
-    def __init__(self, config: ProcessConfig, app_config: DisManagerConfig) -> None:
-        self._config = config
-        self._app_config = app_config
+    def __init__(self, process: ManagedProcess) -> None:
+        self._process = process
         self.backups_dir.mkdir(parents=True, exist_ok=True)
 
     @property
     def backups_dir(self) -> Path:
         """Return the resolved ``.backups/<process_name>`` directory."""
-        return (BACKUPS_DIR / self._config.name).resolve()
+        return (BACKUPS_DIR / self._process.name).resolve()
 
     def list_backups(self) -> list[BackupEntry]:
         """Return existing numbered backups within ``1..max_backups``, ordered 1..N."""
-        indexed = _scan_backups(self.backups_dir, self._config.name, self._app_config.backups)
+        indexed = _scan_backups(self.backups_dir, self._process.name, self._process.client.config.backups)
         return [
             BackupEntry(
                 name=path.name,
@@ -62,7 +60,7 @@ class BackupManager:
 
     def make(self, on_progress: Callable[[int, int], None] | None = None) -> Path:
         """Create a rotating backup ``<process_name> 1`` from the process directory."""
-        resolved_source = self._config.resolve_path().resolve()
+        resolved_source = self._process.path.resolve()
         if not resolved_source.is_dir():
             raise FileNotFoundError(f"Process directory '{resolved_source}' does not exist.")
 
@@ -73,9 +71,9 @@ class BackupManager:
         if on_progress is not None:
             on_progress(0, total)
 
-        _rotate_backups(backups_root, self._config.name, self._app_config.backups)
+        _rotate_backups(backups_root, self._process.name, self._process.client.config.backups)
 
-        target_dir = backups_root / f'{self._config.name} 1'
+        target_dir = backups_root / f'{self._process.name} 1'
         remove_path(target_dir)
         copy_tree_with_progress(resolved_source, target_dir, on_progress, total=total)
 
@@ -93,7 +91,7 @@ class BackupManager:
         if on_progress is not None:
             on_progress(0, total)
 
-        resolved_target = self._config.resolve_path().resolve()
+        resolved_target = self._process.path.resolve()
         resolved_target.mkdir(parents=True, exist_ok=True)
         clear_directory_contents(resolved_target)
         copy_tree_with_progress(

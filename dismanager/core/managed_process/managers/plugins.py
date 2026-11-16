@@ -15,16 +15,15 @@ from ...extensions import (
 )
 
 if TYPE_CHECKING:
-    from ....discord.client import DisManagerClient
     from ..process import ManagedProcess
 
 
 class PluginManager:
     """Loads, unloads, hot-reloads, and dispatches process events to per-process plugins."""
 
-    def __init__(self, process: ManagedProcess, client: DisManagerClient) -> None:
+    def __init__(self, process: ManagedProcess) -> None:
         self._process = process
-        self._client = client
+        self._client = process.client
         self._plugins: dict[str, object] = {}
         self.plugins_dir.mkdir(parents=True, exist_ok=True)
 

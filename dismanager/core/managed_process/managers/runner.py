@@ -6,27 +6,21 @@ import os
 import shlex
 import subprocess
 import threading
-from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import psutil
 
-from ...process_store import ProcessConfig, ProcessConfigError
+from ...process_store import ProcessConfigError
+
+if TYPE_CHECKING:
+    from ..process import ManagedProcess
 
 
 class ProcessRunner:
     """Low-level OS subprocess runner with stdout reading and process-tree control."""
 
-    def __init__(
-        self,
-        config: ProcessConfig,
-        *,
-        on_line: Callable[[str], None],
-        on_exit: Callable[[str | None, bool], None],
-    ) -> None:
-        self._config = config
-        self._on_line = on_line
-        self._on_exit = on_exit
+    def __init__(self, process: ManagedProcess) -> None:
+        self._process_obj = process
         self._process: subprocess.Popen[bytes] | None = None
         self._stop_requested = False
         self._reader_thread: threading.Thread | None = None
@@ -43,7 +37,7 @@ class ProcessRunner:
             try:
                 for raw_line in iter(stdout.readline, b''):
                     decoded = raw_line.decode('utf-8', errors='replace').rstrip('\r\n')
-                    self._on_line(decoded)
+                    self._process_obj._on_raw_line(decoded)
             finally:
                 with contextlib.suppress(OSError):
                     stdout.close()
@@ -57,7 +51,7 @@ class ProcessRunner:
         if loop is not None and not loop.is_closed():
             crashed = not stop_requested and returncode != 0
             reason = f'Process exited unexpectedly (code {returncode}).' if crashed else None
-            loop.call_soon_threadsafe(self._on_exit, reason, crashed)
+            loop.call_soon_threadsafe(self._process_obj._on_process_exit, reason, crashed)
 
     # --- Internal API ---
 
@@ -66,15 +60,12 @@ class ProcessRunner:
         """Return ``True`` while the underlying OS subprocess is still running."""
         return self._process is not None and self._process.poll() is None
 
-    def update_config(self, config: ProcessConfig) -> None:
-        """Update the active process configuration."""
-        self._config = config
-
     def start(self) -> asyncio.AbstractEventLoop | None:
         """Spawn the configured subprocess, start output reading, and return the active loop."""
-        raw_cmd = self._config.start_command.strip()
+        config = self._process_obj._config
+        raw_cmd = config.start_command.strip()
         if not raw_cmd:
-            raise ProcessConfigError(f"Process '{self._config.name}' has an empty start command.")
+            raise ProcessConfigError(f"Process '{config.name}' has an empty start command.")
 
         args = (
             shlex.split(raw_cmd, posix=True)
@@ -87,9 +78,9 @@ class ProcessRunner:
             ]
         )
         if not args:
-            raise ProcessConfigError(f"Process '{self._config.name}' has an invalid start command.")
+            raise ProcessConfigError(f"Process '{config.name}' has an invalid start command.")
 
-        cwd = self._config.resolve_path()
+        cwd = config.resolve_path()
         cwd.mkdir(parents=True, exist_ok=True)
 
         self._stop_requested = False
@@ -108,7 +99,7 @@ class ProcessRunner:
         try:
             proc = subprocess.Popen(args, **popen_kwargs)
         except OSError as exc:
-            raise ProcessConfigError(f"Could not start '{self._config.name}': {exc}") from exc
+            raise ProcessConfigError(f"Could not start '{config.name}': {exc}") from exc
 
         self._process = proc
         try:
@@ -119,7 +110,7 @@ class ProcessRunner:
         self._reader_thread = threading.Thread(
             target=self._read_output,
             args=(proc, loop),
-            name=f'process-reader-{self._config.name}',
+            name=f'process-reader-{config.name}',
             daemon=True,
         )
         self._reader_thread.start()
