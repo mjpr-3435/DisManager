@@ -8,14 +8,13 @@ from typing import TYPE_CHECKING, Any
 
 import discord
 
-from ....core.backups import BackupEntry, list_backups, process_backups_dir
 from ....core.bootstrap.i18n import _
 from ....core.bootstrap.paths import BACKUPS_DIR
 from ...utils import confirmation_request
 from .embed import format_bytes, to_dismanager_path
 
 if TYPE_CHECKING:
-    from ....core.managed_process import ManagedProcess
+    from ....core.managed_process import BackupEntry, ManagedProcess
     from ...client import DisManagerClient
     from .views import FilesView
 
@@ -39,8 +38,7 @@ class BackupsView(discord.ui.View):
 
     def build_embed(self) -> discord.Embed:
         """Render the backups summary embed for the current process."""
-        backups_dir = process_backups_dir(self.process.name)
-        title_path = to_dismanager_path(backups_dir, self.files_view.root)
+        title_path = to_dismanager_path(self.process.backups_dir, self.files_view.root)
 
         if not self.entries:
             description = f'*{_("No backups found.")}*'
@@ -81,7 +79,7 @@ class BackupsView(discord.ui.View):
 
     def _build_items(self) -> None:
         self.clear_items()
-        self.entries = list_backups(self.process.name)
+        self.entries = self.process.list_backups()
         self.add_item(_BackupSelect(self.bot, self.entries))
         self.add_item(_BackButton(self.bot, row=1))
         self.add_item(_UpdateButton(self.bot, row=1))
@@ -228,5 +226,5 @@ class _FilesButton(discord.ui.Button[BackupsView]):
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
-        target: Path = process_backups_dir(self.view.process.name)
+        target: Path = self.view.process.backups_dir
         await self.view.files_view.navigate(interaction, target, open_backups_ui=False)

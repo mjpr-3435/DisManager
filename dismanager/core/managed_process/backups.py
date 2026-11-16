@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from .bootstrap.paths import BACKUPS_DIR
+from ..bootstrap.paths import BACKUPS_DIR
 
 BACKUP_LOG_FILENAME = 'backup_log.txt'
 _LOG_PREFIX = 'Backup created on: '

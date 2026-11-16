@@ -13,10 +13,10 @@ from typing import TYPE_CHECKING, Any
 
 import psutil
 
-from ..backups import make_backup, process_backups_dir, restore_backup
 from ..bootstrap.logs import ByteRingBuffer, SessionLogWriter
 from ..bootstrap.paths import LOGS_DIR
 from ..process_store import ProcessConfig, ProcessConfigError
+from .backups import BackupEntry, list_backups, make_backup, process_backups_dir, restore_backup
 from .plugins import PluginManager
 from .relay import ConsoleRelay
 
@@ -80,6 +80,15 @@ class ManagedProcess:
     def is_running(self) -> bool:
         """Return ``True`` while the subprocess is alive or its Discord relay is still draining."""
         return self._is_process_alive() or self._relay.is_active
+
+    @property
+    def backups_dir(self) -> Path:
+        """Return the resolved ``.backups/<name>`` directory for this process."""
+        return process_backups_dir(self.name)
+
+    def list_backups(self) -> list[BackupEntry]:
+        """Return existing numbered backups for this process, ordered 1..N."""
+        return list_backups(self.name)
 
     def make_backup(self, progress: list[int] | None = None) -> Path:
         """Create a rotating backup of this process's directory."""
