@@ -29,8 +29,13 @@ class ConsoleRelay:
         self._queue: asyncio.Queue[str | None] = asyncio.Queue(maxsize=_RELAY_QUEUE_MAXSIZE)
         self._omitted_logs = 0
         self._task: asyncio.Task[None] | None = None
+        self._thread: discord.Thread | None = None
         self._stop_reason: str | None = None
         self._finished = False
+
+    @property
+    def thread(self) -> discord.Thread | None:
+        return self._thread
 
     @property
     def is_active(self) -> bool:
@@ -100,7 +105,8 @@ class ConsoleRelay:
         panel = self._client._panel_manager.channel
         if panel is None:
             return None
-        return await get_or_create_thread(panel, f'Console {self.name}')
+        self._thread = await get_or_create_thread(panel, f'Console {self.name}')
+        return self._thread
 
     # =========================================
     #            Internal Helpers

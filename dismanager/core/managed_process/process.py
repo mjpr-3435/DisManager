@@ -21,6 +21,8 @@ from .plugins import PluginManager
 from .relay import ConsoleRelay
 
 if TYPE_CHECKING:
+    import discord
+
     from ...discord.client import DisManagerClient
 
 _ANSI_ESCAPE_RE = re.compile(r'\x1b\[[0-9;?]*[a-zA-Z]')
@@ -56,6 +58,11 @@ class ManagedProcess:
     def path(self) -> Path:
         """Return the resolved working directory for this process."""
         return self._config.resolve_path()
+
+    @property
+    def console_thread(self) -> discord.Thread | None:
+        """Return the resolved Discord console thread for this process, if available."""
+        return self._relay.thread
 
     def update_config(self, config: ProcessConfig) -> None:
         """Update process configuration in-place."""
