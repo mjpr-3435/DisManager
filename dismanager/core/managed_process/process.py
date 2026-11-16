@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from ..process_store import ProcessConfig
+from ..utils import dir_size_bytes
 from .managers import BackupEntry, BackupManager, ConsoleRelay, PluginManager, ProcessRunner
 
 if TYPE_CHECKING:
@@ -121,6 +122,11 @@ class ManagedProcess:
         """Return the resolved ``.backups/<name>`` directory for this process."""
         return self._backups.backups_dir
 
+    @property
+    def plugins_dir(self) -> Path:
+        """Return the per-process plugins directory."""
+        return self._plugins.plugins_dir
+
     def is_running(self) -> bool:
         """Return ``True`` while the subprocess is alive or its Discord relay is still draining."""
         return self._runner.is_alive or self._relay.is_active
@@ -186,6 +192,17 @@ class ManagedProcess:
 
         return self.start()
 
+    def add_log(self, log: str) -> None:
+        """Enqueue a log line into this process's Discord console relay."""
+        self._relay.enqueue(log)
+
+    async def send_to_console(self, message: str) -> discord.Message | None:
+        """Send a message directly to this process's Discord console thread."""
+        thread = await self._relay.ensure_thread()
+        if thread is None:
+            return None
+        return await thread.send(message)
+
     def execute(self, command: str) -> bool:
         """Write a command line to the subprocess stdin."""
         return self._runner.execute(command)
@@ -194,13 +211,17 @@ class ManagedProcess:
         """Return total RSS memory in bytes for the process tree."""
         return self._runner.ram_usage_bytes()
 
+    def disk_usage_bytes(self) -> int:
+        """Return total disk usage in bytes of this process's working directory."""
+        return dir_size_bytes(self._config.resolve_path())
+
     def list_backups(self) -> list[BackupEntry]:
         """Return existing numbered backups for this process, ordered 1..N."""
         return self._backups.list_backups()
 
-    def make_backup(self, progress: list[int] | None = None) -> Path:
+    def make_backup(self, progress: list[int] | None = None, *, force: bool = False) -> Path:
         """Create a rotating backup of this process's directory."""
-        if self.is_running():
+        if not force and self.is_running():
             raise RuntimeError(f"Process '{self.name}' is currently running.")
         return self._backups.make(self._client.config.backups, progress)
 

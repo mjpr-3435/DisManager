@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from ...bootstrap.paths import BACKUPS_DIR
+from ...utils import dir_size_bytes
 
 BACKUP_LOG_FILENAME = 'backup_log.txt'
 _LOG_PREFIX = 'Backup created on: '
@@ -62,7 +63,7 @@ class BackupManager:
                 name=path.name,
                 path=path,
                 created_at=_read_backup_timestamp(path / BACKUP_LOG_FILENAME),
-                size_bytes=_dir_size_bytes(path),
+                size_bytes=dir_size_bytes(path),
             )
             for _, path in indexed
         ]
@@ -181,13 +182,3 @@ def _read_backup_timestamp(log_path: Path) -> str | None:
             return text.removeprefix(_LOG_PREFIX).strip() or None
         return text or None
     return None
-
-
-def _dir_size_bytes(directory: Path) -> int:
-    total = 0
-    with contextlib.suppress(OSError):
-        for entry in directory.rglob('*'):
-            if entry.is_file() and not entry.is_symlink():
-                with contextlib.suppress(OSError):
-                    total += entry.stat().st_size
-    return total
