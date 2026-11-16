@@ -27,7 +27,7 @@ class ProcessStore:
 
     # --- Internal Behaviour ---
 
-    def _save_to_disk(self, processes: Sequence[ProcessConfig]) -> None:
+    def _commit(self, processes: list[ProcessConfig]) -> None:
         """Persist process definitions atomically to disk."""
         payload = [asdict(proc) for proc in processes]
 
@@ -39,9 +39,11 @@ class ProcessStore:
         except OSError as exc:
             raise ProcessConfigError(f"Could not save '{_PROCESSES_FILE}': {exc}") from exc
 
+        self._configs = processes
+
     def _safe_reset_store(self) -> None:
         try:
-            self._save_to_disk([])
+            self._commit([])
         except ProcessConfigError as exc:
             _logger.warning("Could not reset process store '%s': %s", _PROCESSES_FILE, exc)
 
@@ -90,7 +92,7 @@ class ProcessStore:
 
         if needs_repair:
             try:
-                self._save_to_disk(processes)
+                self._commit(processes)
             except ProcessConfigError as exc:
                 _logger.warning("Could not save repaired process store '%s': %s", _PROCESSES_FILE, exc)
 
@@ -171,7 +173,7 @@ class ProcessStore:
 
     def save(self) -> None:
         """Persist the current in-memory process configurations to disk."""
-        self._save_to_disk(self._configs)
+        self._commit(self._configs)
 
     def get(self, name: str) -> ProcessConfig | None:
         """Return a configured process matching ``name`` case-insensitively."""
@@ -189,8 +191,7 @@ class ProcessStore:
             raise ProcessConfigError(f'Maximum of {MAX_PROCESSES} processes reached.')
 
         updated = [*self._configs, config]
-        self._save_to_disk(updated)
-        self._configs = updated
+        self._commit(updated)
         return config
 
     def update(self, target: str, payload: Mapping[str, Any]) -> ProcessConfig:
@@ -203,8 +204,7 @@ class ProcessStore:
 
         updated = self._configs.copy()
         updated[match_idx] = config
-        self._save_to_disk(updated)
-        self._configs = updated
+        self._commit(updated)
         return config
 
     def delete(self, target: str) -> ProcessConfig:
@@ -215,6 +215,5 @@ class ProcessStore:
             raise ProcessConfigError(f"Process '{target}' was not found.")
 
         updated = [proc for proc in self._configs if proc.name.casefold() != target_key]
-        self._save_to_disk(updated)
-        self._configs = updated
+        self._commit(updated)
         return removed
