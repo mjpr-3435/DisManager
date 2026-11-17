@@ -11,7 +11,8 @@
 
 ### Description   : The bot token that will be used to initialize DisManager.
 ### Advice        : Use a dedicated bot for DisManager.
-Bot Token:
+### Default Value : ""
+Bot Token: ""
 
 ### Description   : The global bot prefix.
 ### Default Value : "!!"

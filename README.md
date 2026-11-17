@@ -2,6 +2,7 @@
 
 [![Python 3.13+](https://img.shields.io/badge/Python-3.13%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/github/license/mjpr-3435/DisManager.svg)](https://github.com/mjpr-3435/DisManager/blob/main/LICENSE)
+[![Guía](https://img.shields.io/badge/Guía-Español-brightgreen)](GUIDE.md)
 
 **DisManager** es una aplicación en Python para administrar múltiples procesos y retransmitir sus consolas en tiempo real a través de un bot de Discord. Es una evolución de **McDis-RCON**, construida sobre la base del proyecto anterior y las contribuciones aportadas en él (Mauricio y Elí Maciel).
 
@@ -39,7 +40,7 @@ dismanager init
 Esto creará `config.yml`, donde debes configurar:
 - `Bot Token`: token de tu bot de Discord.
 - `Bot Prefix`: prefijo para comandos de texto (por ejemplo `!!`).
-- `Panel Id`: ID del canal de texto donde DisManager publicará el panel.
+- `Panel ID`: ID del canal de texto donde DisManager publicará el panel.
 - `Language`: `en` o `es`.
 - `Backups`: cantidad máxima de copias rotativas por proceso.
 
@@ -50,3 +51,5 @@ dismanager run
 ```
 
 Una vez conectado, usa el botón **Config** del panel en Discord para registrar tus procesos.
+
+Para instrucciones paso a paso (incluyendo instalación desde cero, comandos, gestor de archivos, backups y addons/plugins), consulta la [Guía de uso](GUIDE.md).
