@@ -152,6 +152,16 @@ def _build_panel_embed(
     if len(visible) % 2 == 1 and len(embed.fields) < 25:
         embed.add_field(inline=True, name='', value='')
 
+    warnings: list[str] = []
+    if metrics.disk_percent > 90:
+        warnings.append(_format_warning(_('[Disk Usage]: Disk usage is over 90%.')))
+    if warnings and len(embed.fields) < 25:
+        embed.add_field(
+            inline=False,
+            name=f'> {_("Warnings")}',
+            value='\n'.join(f'`{w}`' for w in warnings),
+        )
+
     embed.set_footer(text=f"🟢 DisManager v{version('dismanager')}  •  RAM: {metrics.app_ram}")
     return embed
 
@@ -177,6 +187,15 @@ async def _publish_or_update_panel(
     if view is not None:
         return await messages[0].edit(embed=embed, view=view)
     return await messages[0].edit(embed=embed)
+
+
+_BLANK_SPACE = '\u200e '
+
+
+def _format_warning(message: str) -> str:
+    warning = f'📌 {message}'
+    warning += max(0, 66 - len(warning)) * _BLANK_SPACE
+    return warning
 
 
 def _ansi_block(rows: list[tuple[str, str]], *, header: str | None = None, width: int = 16) -> str:

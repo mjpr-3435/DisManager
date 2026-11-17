@@ -23,6 +23,7 @@ class SystemMetrics:
     disk_total: str
     disk_used: str
     disk_load: str
+    disk_percent: float
     app_ram: str
 
 
@@ -48,6 +49,7 @@ def collect_system_metrics() -> SystemMetrics:
         disk_total=f'{disk.total / gb:.1f} GB',
         disk_used=f'{disk.used / gb:.1f} GB',
         disk_load=f'{disk.percent:.1f} %',
+        disk_percent=float(disk.percent),
         app_ram=_get_process_ram(),
     )
 

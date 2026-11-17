@@ -66,6 +66,12 @@ msgstr  "Panel"
 msgid   "Error Reports"
 msgstr  "Reportes de errores"
 
+msgid   "Warnings"
+msgstr  "Precauciones"
+
+msgid   "[Disk Usage]: Disk usage is over 90%."
+msgstr  "[Uso de Disco]: El uso de disco supera el 90%."
+
 
 ### ———————————————————————————————————————
 ### files
