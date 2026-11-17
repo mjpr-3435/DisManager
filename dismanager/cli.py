@@ -20,6 +20,7 @@ def init() -> None:
 
 
 def main() -> None:
+    """Parse CLI arguments and dispatch the requested subcommand."""
     parser = argparse.ArgumentParser(description='DisManager CLI')
     subparsers = parser.add_subparsers(dest='command')
 

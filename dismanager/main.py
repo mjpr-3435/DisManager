@@ -16,6 +16,7 @@ _logger = logging.getLogger(__name__)
 
 
 def run() -> None:
+    """Initialize configuration, logging, and run the DisManager Discord client."""
     app_version = version('dismanager')
     print(f'Initializing DisManager v{app_version}...')
     ensure_workspace_dirs()

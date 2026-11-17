@@ -43,7 +43,6 @@ class ConsoleThreadManager:
     # --- Internal Behaviour ---
 
     async def _ensure_thread(self) -> discord.Thread | None:
-        """Ensure the ``Console <name>`` thread exists under the panel channel."""
         panel = self._client._panel_manager.channel
         if panel is None:
             return None

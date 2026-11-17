@@ -16,8 +16,6 @@ _logger = logging.getLogger(__name__)
 
 
 class _BotEvents(commands.Cog):
-    """Discord event listeners for panel threads and per-process console threads."""
-
     def __init__(self, bot: DisManagerClient) -> None:
         self.bot = bot
 

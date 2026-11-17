@@ -28,7 +28,6 @@ class ProcessStore:
     # --- Internal Behaviour ---
 
     def _commit(self, processes: list[ProcessConfig]) -> None:
-        """Persist process definitions atomically to disk."""
         payload = [asdict(proc) for proc in processes]
 
         try:

@@ -1,11 +1,4 @@
-from .archive_operations import (
-    TAR_SUFFIXES,
-    build_archive_tree_text,
-    compress_directory,
-    extract_archive,
-    is_archive_file,
-    read_archive_entries,
-)
+from .archive_operations import compress_directory, extract_archive
 from .file_operations import (
     clear_directory_contents,
     copy_tree_with_progress,
@@ -20,21 +13,16 @@ from .file_operations import (
     rename_entry,
 )
 from .file_preview import (
-    MAX_IMAGE_PREVIEW_BYTES,
     ArchivePreview,
-    FilePreview,
     ImagePreview,
     PreviewUnavailable,
     TextPreview,
     inspect_file_preview,
     is_previewable_image,
 )
-from .sandbox_paths import FileActionError, SandboxPaths, is_valid_entry_name
+from .sandbox_paths import FileActionError, SandboxPaths
 from .text_files import (
-    MAX_EDITABLE_TEXT_BYTES,
     MAX_EDITABLE_TEXT_CHARS,
-    TextSnippet,
-    extract_text_snippet,
     is_editable_text,
     read_text_for_edit,
     write_text_file,
@@ -43,17 +31,11 @@ from .text_files import (
 __all__ = [
     'ArchivePreview',
     'FileActionError',
-    'FilePreview',
     'ImagePreview',
-    'MAX_EDITABLE_TEXT_BYTES',
     'MAX_EDITABLE_TEXT_CHARS',
-    'MAX_IMAGE_PREVIEW_BYTES',
     'PreviewUnavailable',
     'SandboxPaths',
-    'TAR_SUFFIXES',
     'TextPreview',
-    'TextSnippet',
-    'build_archive_tree_text',
     'clear_directory_contents',
     'compress_directory',
     'copy_tree_with_progress',
@@ -61,16 +43,12 @@ __all__ = [
     'create_directory',
     'delete_entry',
     'extract_archive',
-    'extract_text_snippet',
     'get_sibling_files',
     'inspect_file_preview',
-    'is_archive_file',
     'is_editable_text',
     'is_previewable_image',
-    'is_valid_entry_name',
     'list_directory_entries',
     'path_size_bytes',
-    'read_archive_entries',
     'read_file_size',
     'read_text_for_edit',
     'remove_path',

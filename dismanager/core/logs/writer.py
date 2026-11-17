@@ -24,6 +24,7 @@ class SessionLogWriter:
         self._stream = self.path.open('a', encoding='utf-8')
 
     def write_line(self, line: str) -> None:
+        """Append a single log line to disk while enforcing the 25 MB session cap."""
         # Normalize newline and measure actual UTF-8 byte length to enforce the 25 MB cap.
         text = line if line.endswith('\n') else f'{line}\n'
         msg_bytes = text.encode('utf-8', errors='replace')
@@ -45,6 +46,7 @@ class SessionLogWriter:
             self._stream.flush()
 
     def close(self) -> None:
+        """Close the active session log file stream."""
         with self._lock:
             if not self._stream.closed:
                 self._stream.close()

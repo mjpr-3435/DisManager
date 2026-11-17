@@ -48,7 +48,6 @@ def load_config() -> DisManagerConfig:
 
 
 def _validate_config(raw: object) -> DisManagerConfig:
-    """Validate a parsed YAML object and return a typed DisManagerConfig."""
     if not isinstance(raw, Mapping):
         raise ConfigError('Configuration root must be a YAML mapping.')
 

@@ -71,7 +71,6 @@ def _build_panel_embed(
     error_thread: discord.Thread,
     process_snapshots: Sequence[_ProcessSnapshot],
 ) -> discord.Embed:
-    """Build the Discord embed displaying host system metrics."""
     panel_colour = 0x2F3136
     console_commands = ('start', 'stop', 'kill', 'restart', 'logs', 'plreload')
     panel_commands = ('start', 'stop', 'kill', 'restart', 'plreload', 'adreload')
@@ -164,7 +163,6 @@ async def _publish_or_update_panel(
     *,
     view: discord.ui.View | None,
 ) -> discord.Message:
-    """Publish the panel embed or update the existing bot message in the channel."""
     messages = [msg async for msg in channel.history(limit=None, oldest_first=True)]
 
     if not messages:

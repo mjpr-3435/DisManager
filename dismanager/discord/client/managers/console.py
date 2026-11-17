@@ -36,7 +36,6 @@ class ConsoleManager:
     # --- Internal Behaviour ---
 
     async def _loop(self) -> None:
-        """Read console commands asynchronously without blocking the event loop."""
         header = (
             f"{_('Commands')}: "
             'start, stop, restart, kill, plreload, adreload, status, exit'

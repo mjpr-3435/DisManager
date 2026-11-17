@@ -32,7 +32,6 @@ class AddonManager:
     # --- Internal Behaviour ---
 
     async def _emit_and_wait(self, event_name: str, *args: Any) -> None:
-        """Dispatch a DisManager lifecycle or process event to addons that implement it."""
         await dispatch_hook(
             self._addons,
             event_name,

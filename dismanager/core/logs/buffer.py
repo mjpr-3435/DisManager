@@ -16,6 +16,7 @@ class ByteRingBuffer:
         self._lock = threading.Lock()
 
     def append(self, line: str) -> None:
+        """Append a UTF-8 line to the buffer, evicting oldest entries past 8 MB."""
         chunk = (line + '\n').encode('utf-8', errors='replace')
         # If a single oversized line exceeds 8 MB, keep only its trailing 8 MB.
         if len(chunk) > _MAX_MEMORY_BYTES:
@@ -30,11 +31,13 @@ class ByteRingBuffer:
                 self._total_bytes -= len(removed)
 
     def get_bytes(self) -> bytes:
+        """Return all currently buffered log lines concatenated as bytes."""
         # Join all buffered chunks into a single bytes payload ready to upload.
         with self._lock:
             return b''.join(self._chunks)
 
     def clear(self) -> None:
+        """Discard all buffered log chunks and reset the byte counter."""
         with self._lock:
             self._chunks.clear()
             self._total_bytes = 0

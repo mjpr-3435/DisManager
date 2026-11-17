@@ -15,4 +15,4 @@ async def setup(bot: DisManagerClient) -> None:
     await setup_events(bot)
 
 
-__all__ = ['setup', 'setup_commands', 'setup_events']
+__all__ = ['setup']

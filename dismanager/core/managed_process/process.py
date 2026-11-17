@@ -42,11 +42,9 @@ class ManagedProcess:
     # --- Internal API ---
 
     def _update_config(self, config: ProcessConfig) -> None:
-        """Update process configuration in-place."""
         self._config = config
 
     async def _delete_folder(self) -> None:
-        """Safely delete the process working directory if it resides under the workspace root."""
         root = Path.cwd().resolve()
         candidate_dir = self._config.resolve_path().resolve()
         if candidate_dir == root or not candidate_dir.is_relative_to(root):
@@ -55,11 +53,9 @@ class ManagedProcess:
             await asyncio.to_thread(shutil.rmtree, candidate_dir)
 
     async def _send_logs(self) -> None:
-        """Send this process's recent 8 MB log buffer to its Discord console thread."""
         await self._console_thread.send_log_file(self._logger.recent_bytes())
 
     async def _shutdown(self) -> None:
-        """Stop the subprocess gracefully, force-kill after 60 s, and drain its Discord relay."""
         if self._runner.is_alive:
             self.stop()
             deadline = asyncio.get_running_loop().time() + 60.0

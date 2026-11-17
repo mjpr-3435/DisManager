@@ -85,8 +85,6 @@ class LogSession:
 
 
 class _CappedFileHandler(logging.Handler):
-    """Logging handler adapter that delegates each record to the disk writer."""
-
     def __init__(self, writer: SessionLogWriter) -> None:
         super().__init__()
         self._writer = writer
@@ -102,8 +100,6 @@ class _CappedFileHandler(logging.Handler):
 
 
 class _MemoryRingHandler(logging.Handler):
-    """Logging handler adapter that keeps the most recent 8 MB of logs in RAM."""
-
     def __init__(self) -> None:
         super().__init__()
         self._buffer = ByteRingBuffer()
@@ -117,7 +113,5 @@ class _MemoryRingHandler(logging.Handler):
 
 
 class _ShortConsoleFormatter(logging.Formatter):
-    """Format console log records as a single clean line without tracebacks."""
-
     def format(self, record: logging.LogRecord) -> str:
         return f'[{record.levelname}] {record.getMessage()}'

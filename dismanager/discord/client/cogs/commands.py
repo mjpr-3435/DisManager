@@ -23,8 +23,6 @@ _logger = logging.getLogger(__name__)
 
 
 class _BotCommands(commands.Cog):
-    """Discord text commands for DisManager."""
-
     def __init__(self, bot: DisManagerClient) -> None:
         self.bot = bot
 
