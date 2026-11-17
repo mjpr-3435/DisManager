@@ -552,3 +552,123 @@ msgstr  "*(archivo binario — vista previa no disponible)*"
 
 msgid   "... (truncated)"
 msgstr  "... (truncado)"
+
+### ———————————————————————————————————————
+### guide
+
+msgid   "Overview"
+msgstr  "Resumen"
+
+msgid   "Introduction and quick index of all sections"
+msgstr  "Introducción e índice rápido de todas las secciones"
+
+msgid   "DisManager lets you manage multiple processes and stream their consoles through Discord without modifying your programs.\n\nUse the **dropdown menu** below to jump to a section or the **navigation buttons** to read page by page. You can also open the full `GUIDE.md` on GitHub."
+msgstr  "DisManager te permite administrar múltiples procesos y retransmitir sus consolas por Discord sin modificar tus programas.\n\nUsa el **menú desplegable** de abajo para saltar a una sección o los **botones de navegación** para leer página por página. También puedes abrir la `GUIDE.md` completa en GitHub."
+
+msgid   "Sections"
+msgstr  "Secciones"
+
+msgid   "• **1. Getting Started & Local Console** — `init`, `config.yml`, `run`, `>>` commands\n• **2. Process Configuration** — `Name`, `Start`, `Stop`, `Blacklist`\n• **3. Panel & Console Threads** — `Console` threads, prefix commands, relay queue\n• **4. Backups & Files** — Rotating backups, explorer, previews, upload, `.zip`\n• **5. Addons, Plugins & Errors** — Hooks, hot-reload, `Error Reports`"
+msgstr  "• **1. Primeros pasos y Consola local** — `init`, `config.yml`, `run`, comandos `>>`\n• **2. Configurar procesos** — `Name`, `Start`, `Stop`, `Blacklist`\n• **3. Panel e Hilos de consola** — Hilos `Console`, comandos con prefijo y cola\n• **4. Backups y Archivos** — Copias rotativas, explorador, vistas previas, subida, `.zip`\n• **5. Addons, Plugins y Errores** — Hooks, recarga en caliente y `Error Reports`"
+
+msgid   "1. Getting Started & Local Console"
+msgstr  "1. Primeros pasos y Consola local"
+
+msgid   "Initialization, config.yml, and terminal commands"
+msgstr  "Inicialización, config.yml y comandos de terminal"
+
+msgid   "Run `dismanager init` in your working folder to generate `config.yml`, fill in your bot settings (`Bot Token`, `Bot Prefix`, `Panel ID`, `Language`, `Backups`), and start with `dismanager run`."
+msgstr  "Ejecuta `dismanager init` en tu carpeta de trabajo para generar `config.yml`, completa los ajustes del bot (`Bot Token`, `Bot Prefix`, `Panel ID`, `Language`, `Backups`) e inicia con `dismanager run`."
+
+msgid   "Folder Layout"
+msgstr  "Estructura de carpetas"
+
+msgid   "• `DisManager/<process>/` — Working directory for each process\n• `DisManager/<process>/.plugins/` — Per-process Python plugins\n• `DisManager/.addons/` — Global bot addons\n• `DisManager/.backups/` — Rotating process backups\n• `DisManager/.dismanager/` — `processes.json` and logs"
+msgstr  "• `DisManager/<proceso>/` — Carpeta de trabajo de cada proceso\n• `DisManager/<proceso>/.plugins/` — Plugins Python de ese proceso\n• `DisManager/.addons/` — Addons globales del bot\n• `DisManager/.backups/` — Copias de seguridad rotativas\n• `DisManager/.dismanager/` — `processes.json` y logs"
+
+msgid   "Local Console Commands (>>)"
+msgstr  "Comandos de consola local (>>)"
+
+msgid   "• `start`, `stop`, `restart`, `kill`, `plreload` (`<name>` or `-all`)\n• `adreload` — Reloads global addons\n• `status` — Shows online state and RAM usage\n• `exit` — Gracefully stops processes (60s timeout) and exits"
+msgstr  "• `start`, `stop`, `restart`, `kill`, `plreload` (`<nombre>` o `-all`)\n• `adreload` — Recarga los addons globales\n• `status` — Muestra estado en línea y uso de RAM\n• `exit` — Detiene procesos ordenadamente (límite 60s) y sale"
+
+msgid   "2. Process Configuration"
+msgstr  "2. Configurar procesos"
+
+msgid   "How Name, Start command, Stop command, and Blacklist work"
+msgstr  "Cómo funcionan Name, Start command, Stop command y Blacklist"
+
+msgid   "Use the **Config** button on the panel to register, edit, or delete up to 15 processes (saved in `.dismanager/processes.json`)."
+msgstr  "Usa el botón **Config** del panel para registrar, editar o eliminar hasta 15 procesos (guardados en `.dismanager/processes.json`)."
+
+msgid   "Fields"
+msgstr  "Campos"
+
+msgid   "• **Name:** Display name, `Console <Name>` thread, and `DisManager/<Name>/` folder.\n• **Start command:** Exact command launched directly inside `DisManager/<Name>/` (without an intermediate shell). For shell syntax (`&&`, `|`, env vars), put it in a `.sh` (use `exec ...` on Linux) or `.bat` script.\n• **Stop command (optional):** Sent to the process console on `stop`/`restart`. If left empty, `stop` forces a `kill`.\n• **Blacklist (optional):** One filter per line (case-sensitive substring). Matching lines are hidden in Discord only, while still saved to `.log` files."
+msgstr  "• **Name:** Nombre visible, hilo `Console <Name>` y carpeta `DisManager/<Name>/`.\n• **Start command:** Comando exacto lanzado directamente dentro de `DisManager/<Name>/` (sin shell intermedia). Si usas sintaxis de shell (`&&`, `|`, variables), ponlo en un script `.sh` (usa `exec ...` en Linux) o `.bat`.\n• **Stop command (opcional):** Se envía a la consola del proceso con `stop`/`restart`. Si se deja vacío, `stop` hace `kill` directamente.\n• **Blacklist (opcional):** Un filtro por línea (subcadena sensible a mayúsculas). Oculta líneas que lo contengan solo en Discord, pero se siguen guardando en `.log`."
+
+msgid   "3. Panel & Console Threads"
+msgstr  "3. Panel e Hilos de consola"
+
+msgid   "Using Console threads, prefix commands, and relay queue"
+msgstr  "Uso de hilos Console, comandos con prefijo y cola del relay"
+
+msgid   "The main panel shows host CPU, RAM, storage, and each process status with a link to its `Console <process>` thread."
+msgstr  "El panel principal muestra CPU, RAM, almacenamiento del host y el estado de cada proceso con acceso a su hilo `Console <proceso>`."
+
+msgid   "Inside Console <process>"
+msgstr  "Dentro de Console <proceso>"
+
+msgid   "Any normal message you type is sent directly to the process console. You can also type:\n• `start`, `stop`, `kill`, `restart`, `plreload`\n• `logs` — Uploads the recent `.log` buffer (up to 8 MB)"
+msgstr  "Cualquier mensaje normal que escribas se envía a la consola del proceso. También puedes escribir:\n• `start`, `stop`, `kill`, `restart`, `plreload`\n• `logs` — Sube el historial reciente `.log` (hasta 8 MB)"
+
+msgid   "Panel Channel Commands & Relay"
+msgstr  "Comandos del canal del panel y Relay"
+
+msgid   "• `{0}start`, `{0}stop`, `{0}kill`, `{0}restart`, `{0}plreload` (`<name>` or `-all`)\n• `{0}adreload` — Reloads global addons\n• Relay packs multiple lines per message; if the queue hits 1000 lines, oldest lines are dropped and a notice reports how many were omitted."
+msgstr  "• `{0}start`, `{0}stop`, `{0}kill`, `{0}restart`, `{0}plreload` (`<nombre>` o `-all`)\n• `{0}adreload` — Recarga los addons globales\n• El relay agrupa líneas por mensaje; si la cola llega a 1000 líneas, descarta las más antiguas y avisa cuántas se omitieron."
+
+msgid   "4. Backups & Files"
+msgstr  "4. Backups y Archivos"
+
+msgid   "Managing rotating backups and the Files explorer"
+msgstr  "Gestión de copias rotativas y explorador Files"
+
+msgid   "Use the **Backups** and **Files** buttons on the panel to manage process data safely without leaving Discord."
+msgstr  "Usa los botones **Backups** y **Files** del panel para gestionar los datos de tus procesos sin salir de Discord."
+
+msgid   "The process must be stopped before creating or restoring a backup.\n• **[Make Backup]:** Copies files to `.backups/<process>/<process> 1` and rotates older backups up to `Backups` in `config.yml`.\n• **Restore:** Replaces current files in `DisManager/<process>/` with live progress."
+msgstr  "El proceso debe estar detenido antes de crear o restaurar una copia.\n• **[Crear copia]:** Copia los archivos a `.backups/<proceso>/<proceso> 1` y rota copias anteriores hasta el límite `Backups` de `config.yml`.\n• **Restaurar:** Reemplaza los archivos actuales en `DisManager/<proceso>/` con progreso en vivo."
+
+msgid   "Files Explorer"
+msgstr  "Explorador Files"
+
+msgid   "Confined to `DisManager/...` with pagination (`99` entries/page) and path jump (`📌`).\n• **Folders:** Open/delete by index, calculate size, create folder, upload up to 10 files, compress to `.zip`, rename, delete.\n• **Files:** Inline previews (images ≤ 8 MB, UTF-8 text, `.zip`/`.tar` trees), download, rename, edit (≤ 4000 chars), unzip, delete."
+msgstr  "Confinado a `DisManager/...` con paginación (`99` entradas/página) y salto a ruta (`📌`).\n• **Carpetas:** Abrir/borrar por índice, calcular tamaño, crear carpeta, subir hasta 10 archivos, comprimir a `.zip`, renombrar, eliminar.\n• **Archivos:** Vista previa (imágenes ≤ 8 MB, texto UTF-8, árboles `.zip`/`.tar`), descargar, renombrar, editar (≤ 4000 chars), extraer `.zip`, eliminar."
+
+msgid   "5. Addons, Plugins & Errors"
+msgstr  "5. Addons, Plugins y Errores"
+
+msgid   "Extending DisManager with Python hooks and Error Reports"
+msgstr  "Extender DisManager con hooks Python y Reportes de Error"
+
+msgid   "Place `.py` files or packages (`__init__.py`) in `.addons/` (class `addon(BaseAddon)`) or `<process>/.plugins/` (class `plugin(BasePlugin)`)."
+msgstr  "Coloca archivos `.py` o paquetes (`__init__.py`) en `.addons/` (clase `addon(BaseAddon)`) o `<proceso>/.plugins/` (clase `plugin(BasePlugin)`)."
+
+msgid   "Lifecycle Hooks"
+msgstr  "Hooks de ciclo de vida"
+
+msgid   "• `unload()` — Cleanup before unload/reload\n• `on_addons_load` / `on_addons_unload` (addons)\n• `on_plugins_load` / `on_plugins_unload`\n• `on_process_start` / `on_process_stop` / `on_process_crash`\n• `on_process_log` — Filtered console lines"
+msgstr  "• `unload()` — Limpieza antes de descargar/recargar\n• `on_addons_load` / `on_addons_unload` (addons)\n• `on_plugins_load` / `on_plugins_unload`\n• `on_process_start` / `on_process_stop` / `on_process_crash`\n• `on_process_log` — Líneas de consola filtradas"
+
+msgid   "Error Reports"
+msgstr  "Reportes de Error"
+
+msgid   "Unhandled exceptions are logged to `.dismanager/logs/` and notified in the `Error Reports` thread. Use `{0}log` inside that thread to download the session log."
+msgstr  "Las excepciones no controladas se guardan en `.dismanager/logs/` y se notifican en el hilo `Error Reports`. Usa `{0}log` dentro de ese hilo para descargar el log de sesión."
+
+msgid   "Select a section"
+msgstr  "Selecciona una sección"
+
+msgid   "Open GUIDE.md"
+msgstr  "Abrir GUIDE.md"

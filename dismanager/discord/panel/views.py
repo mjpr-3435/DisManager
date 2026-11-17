@@ -8,7 +8,7 @@ from ...core.bootstrap.i18n import _
 from ..utils import confirmation_request
 from .backups import BackupsView
 from .files import FilesView
-from .guide import build_guide_embed
+from .guide import GuideView
 from .processes import ProcessesConfigView
 
 if TYPE_CHECKING:
@@ -24,7 +24,7 @@ class PanelView(discord.ui.View):
         self.add_item(_ConfigButton(bot))
         self.add_item(_BackupsButton(bot))
         self.add_item(_FilesButton(bot))
-        self.add_item(_GuideButton())
+        self.add_item(_GuideButton(bot))
         self.add_item(_RestartButton(bot))
 
 
@@ -70,11 +70,13 @@ class _BackupsButton(discord.ui.Button[PanelView]):
 
 
 class _GuideButton(discord.ui.Button[PanelView]):
-    def __init__(self) -> None:
+    def __init__(self, bot: DisManagerClient) -> None:
         super().__init__(label='Guide', style=discord.ButtonStyle.gray)
+        self.bot = bot
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
-        await interaction.response.send_message(embed=build_guide_embed(), ephemeral=True)
+        view = GuideView(self.bot)
+        await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
 
 
 class _RestartButton(discord.ui.Button[PanelView]):
