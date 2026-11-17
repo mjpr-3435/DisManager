@@ -378,3 +378,177 @@ msgstr  "Recursos del Sistema"
 
 msgid   "Closing processes..."
 msgstr  "Cerrando procesos..."
+
+msgid   "creating thread..."
+msgstr  "creando hilo..."
+
+msgid   "Online"
+msgstr  "En línea"
+
+msgid   "Offline"
+msgstr  "Desconectado"
+
+### ———————————————————————————————————————
+### addons & plugins
+
+msgid   "   • Importing addons:"
+msgstr  "   • Importando addons:"
+
+msgid   "     -> Imported {}"
+msgstr  "     -> Importado {}"
+
+msgid   "     -> Unable to import {}"
+msgstr  "     -> No se pudo importar {}"
+
+msgid   "Reloading DisManager plugins..."
+msgstr  "Recargando plugins de DisManager..."
+
+msgid   "No plugins to import."
+msgstr  "No hay plugins para importar."
+
+msgid   "Loaded plugin: {}"
+msgstr  "Plugin cargado: {}"
+
+msgid   "Loaded {} plugin(s)."
+msgstr  "{} plugin(s) cargado(s)."
+
+msgid   "Failed to load plugin: {} (see Error Reports)."
+msgstr  "Error al cargar plugin: {} (revisa Reportes de Error)."
+
+### ———————————————————————————————————————
+### commands
+
+msgid   "Specify the process. E.g.: {0}{1}{2} <name>{0} or {0}{1}{2}-all{0}"
+msgstr  "Especifica el proceso. Ej.: {0}{1}{2} <nombre>{0} o {0}{1}{2}-all{0}"
+
+msgid   "Process {} not found."
+msgstr  "Proceso {} no encontrado."
+
+msgid   "No eligible processes for {}."
+msgstr  "No hay procesos elegibles para {}."
+
+msgid   "Reloaded {} addon(s)."
+msgstr  "{} addon(s) recargado(s)."
+
+msgid   "Reloaded {} plugin(s)."
+msgstr  "{} plugin(s) recargado(s)."
+
+msgid   "The process is already running."
+msgstr  "El proceso ya está en ejecución."
+
+msgid   "Initializing process."
+msgstr  "Iniciando proceso."
+
+msgid   "The process is not running."
+msgstr  "El proceso no está en ejecución."
+
+msgid   "Stopping process."
+msgstr  "Deteniendo proceso."
+
+msgid   "Killing process."
+msgstr  "Forzando cierre del proceso."
+
+msgid   "Restarting process."
+msgstr  "Reiniciando proceso."
+
+### ———————————————————————————————————————
+### backups
+
+msgid   "Backups"
+msgstr  "Copias de seguridad"
+
+msgid   "No processes configured."
+msgstr  "No hay procesos configurados."
+
+msgid   "No backups found."
+msgstr  "No se encontraron copias de seguridad."
+
+msgid   "Disk Usage"
+msgstr  "Uso de disco"
+
+msgid   "Date"
+msgstr  "Fecha"
+
+msgid   "Max backups: {}"
+msgstr  "Máximo de copias: {}"
+
+msgid   "➕ [Make Backup]"
+msgstr  "➕ [Crear copia]"
+
+msgid   "Create a new rotating backup"
+msgstr  "Crear una nueva copia de seguridad rotativa"
+
+msgid   "Select a backup"
+msgstr  "Selecciona una copia de seguridad"
+
+msgid   "Update"
+msgstr  "Actualizar"
+
+msgid   "✖ Process `{}` is running. Stop it before managing backups."
+msgstr  "✖ El proceso `{}` está en ejecución. Detenlo antes de gestionar copias."
+
+msgid   "Create a new backup for `{}`?"
+msgstr  "¿Crear una nueva copia de seguridad para `{}`?"
+
+msgid   "🔄 `[{}]:` [{}/{}] files have been processed..."
+msgstr  "🔄 `[{}]:` [{}/{}] archivos procesados..."
+
+msgid   "✔ Backup for `{}` created successfully."
+msgstr  "✔ Copia de seguridad para `{}` creada correctamente."
+
+msgid   "✖ Backup not found."
+msgstr  "✖ Copia de seguridad no encontrada."
+
+msgid   "Restore `{}` into `{}`? Current files in `{}` will be replaced."
+msgstr  "¿Restaurar `{}` en `{}`? Los archivos actuales en `{}` serán reemplazados."
+
+msgid   "🔄 `[{}]:` [{}/{}] files have been unpacked..."
+msgstr  "🔄 `[{}]:` [{}/{}] archivos restaurados..."
+
+msgid   "✔ Backup `{}` restored successfully."
+msgstr  "✔ Copia `{}` restaurada correctamente."
+
+### ———————————————————————————————————————
+### files (extra)
+
+msgid   "✖ Invalid file path."
+msgstr  "✖ Ruta de archivo no válida."
+
+msgid   "✖ Invalid directory path."
+msgstr  "✖ Ruta de directorio no válida."
+
+msgid   "Dirs: {}"
+msgstr  "Carpetas: {}"
+
+msgid   "Files: {}"
+msgstr  "Archivos: {}"
+
+msgid   "Size: {}"
+msgstr  "Tamaño: {}"
+
+msgid   "Modified: {}"
+msgstr  "Modificado: {}"
+
+msgid   "Page {}/{}"
+msgstr  "Página {}/{}"
+
+msgid   "File {:02d} (#{}/{})"
+msgstr  "Archivo {:02d} (#{}/{})"
+
+msgid   "File {}/{}"
+msgstr  "Archivo {}/{}"
+
+msgid   "*(image too large to preview)*"
+msgstr  "*(imagen demasiado grande para previsualizar)*"
+
+msgid   "*(empty file)*"
+msgstr  "*(archivo vacío)*"
+
+msgid   "*(empty archive)*"
+msgstr  "*(archivo comprimido vacío)*"
+
+msgid   "*(binary file — preview not available)*"
+msgstr  "*(archivo binario — vista previa no disponible)*"
+
+msgid   "... (truncated)"
+msgstr  "... (truncado)"

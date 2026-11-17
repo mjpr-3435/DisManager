@@ -4,6 +4,7 @@ from pathlib import Path
 
 import discord
 
+from ....core.bootstrap.i18n import _
 from ....core.files import (
     ArchivePreview,
     ImagePreview,
@@ -68,7 +69,7 @@ def populate_file_preview(embed: discord.Embed, path: Path, size_bytes: int) -> 
 
     if isinstance(preview, TextPreview):
         lang = _CODE_LANG_BY_EXT.get(preview.suffix, '')
-        suffix_note = '\n... (truncated)' if preview.truncated else ''
+        suffix_note = f"\n{_('... (truncated)')}" if preview.truncated else ''
         embed.description = _format_code_block(lang, f'{preview.content}{suffix_note}')
         return
 
@@ -88,4 +89,4 @@ def _format_code_block(lang: str, body: str) -> str:
 def _format_unavailable(preview: PreviewUnavailable) -> str:
     if preview.reason == 'read_error':
         return f'```\n{preview.detail or "Read error"}```'
-    return _UNAVAILABLE_MESSAGES[preview.reason]
+    return _(_UNAVAILABLE_MESSAGES[preview.reason])

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import discord
 
+from ....core.bootstrap.i18n import _
 from ....core.files import SandboxPaths, get_sibling_files, list_directory_entries
 from ....core.format import format_bytes
 from .preview import populate_file_preview
@@ -65,11 +66,11 @@ def _populate_directory_embed(
     for col in _build_columns(files, '📄', current_page):
         embed.add_field(inline=True, name='', value=col)
 
-    footer_parts = [f'Dirs: {len(dirs)}', f'Files: {len(files)}']
+    footer_parts = [_('Dirs: {}').format(len(dirs)), _('Files: {}').format(len(files))]
     if size_text is not None:
-        footer_parts.insert(0, f'Size: {size_text}')
+        footer_parts.insert(0, _('Size: {}').format(size_text))
     if max_page > 1:
-        footer_parts.append(f'Page {current_page}/{max_page}')
+        footer_parts.append(_('Page {}/{}').format(current_page, max_page))
     embed.set_footer(text=' | '.join(footer_parts))
 
 
@@ -83,7 +84,7 @@ def _populate_file_embed(embed: discord.Embed, path: Path) -> None:
     populate_file_preview(embed, path, stat.st_size)
     size = format_bytes(stat.st_size)
     modified = datetime.fromtimestamp(stat.st_mtime, tz=UTC).astimezone().strftime('%Y-%m-%d %H:%M')
-    footer_parts = [f'Size: {size}', f'Modified: {modified}']
+    footer_parts = [_('Size: {}').format(size), _('Modified: {}').format(modified)]
     sibling_info = get_sibling_files(path)
     if sibling_info is not None:
         files, idx = sibling_info
@@ -92,11 +93,11 @@ def _populate_file_embed(embed: discord.Embed, path: Path) -> None:
         total_pages = max(1, math.ceil(total_files / ENTRIES_PER_PAGE))
         page_idx = (idx % ENTRIES_PER_PAGE) + 1
         file_label = (
-            f'File {page_idx:02d} (#{idx + 1}/{total_files})'
+            _('File {:02d} (#{}/{})').format(page_idx, idx + 1, total_files)
             if total_pages > 1
-            else f'File {idx + 1}/{total_files}'
+            else _('File {}/{}').format(idx + 1, total_files)
         )
-        footer_parts.extend([file_label, f'Page {file_page}/{total_pages}'])
+        footer_parts.extend([file_label, _('Page {}/{}').format(file_page, total_pages)])
     embed.set_footer(text=' | '.join(footer_parts))
 
 
