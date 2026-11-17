@@ -37,3 +37,6 @@ select = ["E", "F", "I", "UP", "B", "C4", "SIM"]
 [build-system]
 requires = ["setuptools>=80"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+dismanager = ["locales/**/*.mo", "templates/*"]
