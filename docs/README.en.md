@@ -5,6 +5,7 @@
 [![Español](https://img.shields.io/badge/README-Español-brightgreen)](../README.md)
 [![English](https://img.shields.io/badge/README-English-blue)](README.en.md)
 [![Guide](https://img.shields.io/badge/Guide-English-blue)](GUIDE.en.md)
+[![Guía](https://img.shields.io/badge/Guía-Español-brightgreen)](GUIDE.md)
 
 **DisManager** is a Python application to manage multiple processes and stream their consoles in real time through a Discord bot. It is an evolution of **McDis-RCON** (originally handwritten with contributions from Mauricio and Elí Maciel); much of its adaptation into this new version was done with **Gemini 4 Hydrogen**, combined with handwritten parts and a review of the core logic adapted by the model.
 
