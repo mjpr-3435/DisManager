@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -16,6 +17,8 @@ from ...extensions import (
 
 if TYPE_CHECKING:
     from ..process import ManagedProcess
+
+_logger = logging.getLogger(__name__)
 
 
 class PluginManager:
@@ -35,6 +38,7 @@ class PluginManager:
     async def load_plugins(self, *, reload: bool) -> int:
         """Discover and load plugins from ``<process>/.plugins/``, purging stale modules on reload."""
         if reload:
+            _logger.info("[%s] Reloading plugins...", self._process.name)
             self._process.add_log(_('Reloading DisManager plugins...'))
             await self.unload_plugins()
 
@@ -49,6 +53,7 @@ class PluginManager:
         candidates = discover_extension_candidates(root)
         if not candidates:
             if reload:
+                _logger.info("[%s] No plugins found to import.", self._process.name)
                 self._process.add_log(_('No plugins to import.'))
             return 0
 
@@ -61,6 +66,7 @@ class PluginManager:
                     'plugin',
                     self._process,
                 )
+                _logger.info("[%s] Loaded plugin '%s'.", self._process.name, plugin_name)
                 self._process.add_log(_('Loaded plugin: {}').format(plugin_name))
             except Exception:
                 self._process.add_log(_('Failed to load plugin: {} (see Error Reports).').format(plugin_name))
@@ -70,8 +76,10 @@ class PluginManager:
         self._client._addons_manager.emit('on_plugins_load', self._process)
         count = len(self._plugins)
         if reload:
+            _logger.info("[%s] Reloaded %d plugin(s).", self._process.name, count)
             self._process.add_log(_('Reloaded {} plugin(s).').format(count))
         elif count:
+            _logger.info("[%s] Loaded %d plugin(s).", self._process.name, count)
             self._process.add_log(_('Loaded {} plugin(s).').format(count))
         return count
 
@@ -80,6 +88,12 @@ class PluginManager:
         if not self._plugins:
             return
 
+        _logger.info(
+            '[%s] Unloading %d plugin(s): %s',
+            self._process.name,
+            len(self._plugins),
+            ', '.join(self._plugins),
+        )
         await self.call_plugins('on_plugins_unload')
         await unload_extensions(
             self._plugins,

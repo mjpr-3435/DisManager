@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -11,6 +12,8 @@ from ....core.process_store import ProcessConfig, ProcessConfigError, ProcessSto
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
+
+_logger = logging.getLogger(__name__)
 
 
 class ProcessManager:
@@ -33,18 +36,22 @@ class ProcessManager:
         
         config = self._store.create(target, payload)
         self._processes[config.name.casefold()] = ManagedProcess(config, self._client)
+        _logger.info("Created process '%s'.", config.name)
 
     def _update_process(self, target: str, payload: Mapping[str, Any]) -> None:
         config = self._store.update(target, payload)
         self._processes[config.name.casefold()]._update_config(config)
+        _logger.info("Updated process '%s'.", config.name)
 
     def _delete_process(self, target: str, payload: Mapping[str, Any]) -> None:
         removed = self._store.delete(target)
         key = removed.name.casefold()
         process = self._processes.pop(key)
+        delete_files = bool(payload['delete_files'])
+        _logger.info("Deleted process '%s' (delete_files=%s).", removed.name, delete_files)
         self._deleting.add(key)
         asyncio.create_task(
-            self._cleanup_deleted_process(process, key=key, delete_files=bool(payload['delete_files']))
+            self._cleanup_deleted_process(process, key=key, delete_files=delete_files)
         )
 
     async def _cleanup_deleted_process(self, process: ManagedProcess, *, key: str, delete_files: bool) -> None:
@@ -83,6 +90,7 @@ class ProcessManager:
         self._processes = {
             proc.name.casefold(): ManagedProcess(proc, self._client) for proc in configs
         }
+        _logger.info('Loaded %d process configuration(s).', len(self._processes))
 
     def on_edit(
         self,

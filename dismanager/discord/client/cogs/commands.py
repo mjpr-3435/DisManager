@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import logging
 from typing import TYPE_CHECKING
 
 import discord
@@ -18,6 +19,8 @@ from ....core.commands import (
 if TYPE_CHECKING:
     from ..client import DisManagerClient
 
+_logger = logging.getLogger(__name__)
+
 
 class _BotCommands(commands.Cog):
     """Discord text commands for DisManager."""
@@ -31,6 +34,7 @@ class _BotCommands(commands.Cog):
         if error_thread is None or ctx.channel.id != error_thread.id:
             return
 
+        _logger.info("Discord command 'log' requested by %s (id=%s)", ctx.author, ctx.author.id)
         data = self.bot._log_session.recent_bytes()
         if not data:
             await ctx.send(_('The log file is currently empty.'))
@@ -83,7 +87,8 @@ class _BotCommands(commands.Cog):
     async def adreload_command(self, ctx: commands.Context[DisManagerClient]) -> None:
         if not await self._accept_panel_command(ctx):
             return
-        message = await reload_addons_command(self.bot, markdown=True)
+        source = f'Discord panel ({ctx.author} id={ctx.author.id})'
+        message = await reload_addons_command(self.bot, markdown=True, source=source)
         await ctx.send(message, delete_after=2)
 
     async def _accept_panel_command(self, ctx: commands.Context[DisManagerClient]) -> bool:
@@ -102,7 +107,8 @@ class _BotCommands(commands.Cog):
         if not await self._accept_panel_command(ctx):
             return
 
-        ok, message = await run_process_action(self.bot, action, name, markdown=True)
+        source = f'Discord panel ({ctx.author} id={ctx.author.id})'
+        ok, message = await run_process_action(self.bot, action, name, markdown=True, source=source)
         await ctx.send(message, delete_after=2 if ok else 5)
 
     async def _run_all_processes_command(
@@ -113,7 +119,8 @@ class _BotCommands(commands.Cog):
         if not await self._accept_panel_command(ctx):
             return
 
-        ok, message = await run_all_processes_action(self.bot, action, markdown=True)
+        source = f'Discord panel ({ctx.author} id={ctx.author.id})'
+        ok, message = await run_all_processes_action(self.bot, action, markdown=True, source=source)
         await ctx.send(message, delete_after=3 if ok else 5)
 
 

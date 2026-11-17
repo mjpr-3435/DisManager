@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 import sys
 import threading
@@ -18,6 +19,8 @@ from ....core.commands import (
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
+
+_logger = logging.getLogger(__name__)
 
 
 class ConsoleManager:
@@ -89,29 +92,32 @@ class ConsoleManager:
         arg = parts[1].strip() if len(parts) > 1 else ''
 
         if cmd == 'exit':
+            _logger.info("Local console command: 'exit'")
             await self._client.close()
             return False
 
         if cmd == 'adreload':
-            print(await reload_addons_command(self._client))
+            print(await reload_addons_command(self._client, source='local console'))
             return True
 
         if cmd in ('start', 'stop', 'restart', 'kill', 'plreload'):
             action = cast(ProcessAction, cmd)
-            _ok, message = await run_process_action(self._client, action, arg)
+            _ok, message = await run_process_action(self._client, action, arg, source='local console')
             print(message)
             return True
 
         if cmd in ('start-all', 'stop-all', 'restart-all', 'kill-all', 'plreload-all'):
             action = cast(ProcessAction, cmd.removesuffix('-all'))
-            _ok, message = await run_all_processes_action(self._client, action)
+            _ok, message = await run_all_processes_action(self._client, action, source='local console')
             print(message)
             return True
 
         if cmd == 'status':
+            _logger.info("Local console command: 'status'")
             print(self._status())
             return True
 
+        _logger.info("Unknown local console command: '%s'", cmd)
         print(_("Unknown command: '{}'.").format(cmd))
         return True
 

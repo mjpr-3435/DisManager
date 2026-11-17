@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import logging
 import os
 import shlex
 import subprocess
@@ -14,6 +15,8 @@ from ...process_store import ProcessConfigError
 
 if TYPE_CHECKING:
     from ..process import ManagedProcess
+
+_logger = logging.getLogger(__name__)
 
 
 class ProcessRunner:
@@ -58,7 +61,7 @@ class ProcessRunner:
         if loop is not None and not loop.is_closed():
             crashed = not stop_requested and returncode != 0
             reason = f'Process exited unexpectedly (code {returncode}).' if crashed else None
-            loop.call_soon_threadsafe(self._on_process_exit, reason, crashed)
+            loop.call_soon_threadsafe(self._on_process_exit, reason, crashed, returncode)
 
     # Lifecycle Hooks
 
@@ -76,7 +79,11 @@ class ProcessRunner:
         self._emit_plugin_event('on_process_stop')
         self._process_obj.client._addons_manager.emit('on_process_stop', self._process_obj)
 
-    def _on_process_exit(self, reason: str | None, crashed: bool) -> None:
+    def _on_process_exit(self, reason: str | None, crashed: bool, returncode: int) -> None:
+        if crashed:
+            _logger.warning('[%s] Process crashed (exit code %d).', self._process_obj.name, returncode)
+        else:
+            _logger.info('[%s] Process exited normally (exit code %d).', self._process_obj.name, returncode)
         self._process_obj._logger.close_session()
         self._process_obj._console_thread.finish(reason=reason)
         if crashed:
@@ -159,6 +166,7 @@ class ProcessRunner:
             raise ProcessConfigError(f"Could not start '{config.name}': {exc}") from exc
 
         self._process = proc
+        _logger.info('[%s] Process started (pid=%d).', config.name, proc.pid)
         try:
             loop: asyncio.AbstractEventLoop | None = asyncio.get_running_loop()
         except RuntimeError:
@@ -190,6 +198,7 @@ class ProcessRunner:
         if not self._stop_requested:
             self._stop_requested = True
             self._on_process_stop()
+        _logger.info('[%s] Graceful stop requested.', self._process_obj.name)
         return self.execute(stop_command)
 
     def execute(self, command: str) -> bool:
@@ -214,6 +223,7 @@ class ProcessRunner:
         if not self._stop_requested:
             self._stop_requested = True
             self._on_process_stop()
+        _logger.info('[%s] Force kill requested (pid=%d).', self._process_obj.name, proc.pid)
         with contextlib.suppress(psutil.Error, OSError):
             parent = psutil.Process(proc.pid)
             for child in parent.children(recursive=True):

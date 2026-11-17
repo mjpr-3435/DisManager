@@ -57,6 +57,7 @@ class DisManagerClient(commands.Bot):
 
         self._ready_once = True
         self._processes_manager.load()
+        self._logger.info('Logged in as %s (id=%s).', self.user, self.user.id if self.user else None)
         print(_('Logged in as {}!').format(self.user))
         await self._addons_manager.load_addons(reload=False)
         self._log_session.mute_console()
@@ -90,6 +91,7 @@ class DisManagerClient(commands.Bot):
             return
         self._closing = True
 
+        self._logger.info('Closing DisManager (restart=%s)...', self._should_restart)
         if self._ready_once:
             print(_('Closing DisManager...'))
 
@@ -99,8 +101,9 @@ class DisManagerClient(commands.Bot):
         await self._panel_manager.close()
         await super().close()
 
-    async def request_restart(self) -> None:
+    async def request_restart(self, *, requested_by: str | None = None) -> None:
         """Shut down via the unified close flow and signal the runner to relaunch."""
+        self._logger.info('Restart requested%s.', f' by {requested_by}' if requested_by else '')
         self._should_restart = True
         await self.close()
 

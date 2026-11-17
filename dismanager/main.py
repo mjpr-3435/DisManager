@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import subprocess
 import sys
@@ -11,26 +12,32 @@ from .core.bootstrap.logs import LogSession
 from .core.bootstrap.paths import ensure_workspace_dirs
 from .discord.client import DisManagerClient
 
+_logger = logging.getLogger(__name__)
+
 
 def run() -> None:
-    print(f"Initializing DisManager v{version('dismanager')}...")
+    app_version = version('dismanager')
+    print(f'Initializing DisManager v{app_version}...')
     ensure_workspace_dirs()
     log_session             = LogSession()
+    _logger.info('Initializing DisManager v%s...', app_version)
     should_restart          = False
 
     try:
         config = load_config()
         init_i18n(config.language)
+        _logger.info('Configuration loaded (language=%s, panel_id=%s).', config.language, config.panel_id)
         print(_('Your configuration has been loaded successfully.'))
 
         client = DisManagerClient(config, log_session)
         client.run(config.bot_token)
         should_restart = client.restart_requested()
     except ConfigError as exc:
-        print(f'Configuration error: {exc}', file=sys.stderr)
+        _logger.error('Configuration error: %s', exc)
         sys.exit(1)
     except Exception as exc:
-        print(_('Error while running discord client: {}').format(exc), file=sys.stderr)
+        log_session.unmute_console()
+        _logger.exception('Error while running discord client: %s', exc)
         sys.exit(1)
     finally:
         log_session.close()

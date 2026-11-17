@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -18,6 +19,8 @@ from ...files import (
 
 if TYPE_CHECKING:
     from ..process import ManagedProcess
+
+_logger = logging.getLogger(__name__)
 
 BACKUP_LOG_FILENAME = 'backup_log.txt'
 _LOG_PREFIX = 'Backup created on: '
@@ -79,6 +82,7 @@ class BackupManager:
 
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         (target_dir / BACKUP_LOG_FILENAME).write_text(f'{_LOG_PREFIX}{timestamp}\n', encoding='utf-8')
+        _logger.info("[%s] Backup created: '%s'.", self._process.name, target_dir.name)
         return target_dir
 
     def restore(self, backup_dir: Path, on_progress: Callable[[int, int], None] | None = None) -> None:
@@ -101,6 +105,7 @@ class BackupManager:
             total=total,
             exclude_name=BACKUP_LOG_FILENAME,
         )
+        _logger.info("[%s] Backup restored from '%s'.", self._process.name, resolved_backup.name)
 
 
 # =========================================

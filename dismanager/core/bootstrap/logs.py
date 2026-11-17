@@ -59,6 +59,16 @@ class LogSession:
         self._console_handler.close()
         self._console_handler = None
 
+    def unmute_console(self) -> None:
+        """Re-attach a stderr console handler (e.g. for fatal shutdown errors)."""
+        if self._console_handler is not None:
+            return
+        console_handler = logging.StreamHandler(sys.stderr)
+        console_handler.setLevel(logging.WARNING)
+        console_handler.setFormatter(_ShortConsoleFormatter())
+        self._dismanager_logger.addHandler(console_handler)
+        self._console_handler = console_handler
+
     def close(self) -> None:
         """Detach all session handlers from loggers and close underlying streams."""
         self.mute_console()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import TYPE_CHECKING, Literal
 
 from ..bootstrap.i18n import _
@@ -12,6 +13,8 @@ if TYPE_CHECKING:
 
 ProcessAction = Literal['start', 'stop', 'kill', 'restart', 'plreload']
 
+_logger = logging.getLogger(__name__)
+
 
 async def run_process_action(
     client: DisManagerClient,
@@ -19,6 +22,7 @@ async def run_process_action(
     name: str,
     *,
     markdown: bool = False,
+    source: str = 'unknown',
 ) -> tuple[bool, str]:
     """Resolve a process by name, run ``action``, and return ``(ok, message)``."""
     tick = '`' if markdown else ''
@@ -35,10 +39,18 @@ async def run_process_action(
 
     process = client.find_process(target)
     if process is None:
+        _logger.info("Control action '%s' on '%s' requested by %s -> not found", action, target, source)
         ref = f'`{target}`' if markdown else f"'{target}'"
         return _format_result(False, _('Process {} not found.').format(ref), markdown=markdown)
 
     ok, detail = await _execute_process_action(process, action)
+    _logger.info(
+        "Control action '%s' on '%s' requested by %s -> %s",
+        action,
+        process.name,
+        source,
+        'ok' if ok else 'failed',
+    )
     return _format_result(ok, f'{tick}[{process.name}]{tick}: {detail}', markdown=markdown)
 
 
@@ -47,10 +59,12 @@ async def run_all_processes_action(
     action: ProcessAction,
     *,
     markdown: bool = False,
+    source: str = 'unknown',
 ) -> tuple[bool, str]:
     """Run ``action`` across all configured processes and return ``(ok, summary)``."""
     processes = client.processes
     if not processes:
+        _logger.info("Control action '%s-all' requested by %s -> no processes", action, source)
         return _format_result(False, _('No processes configured.'), markdown=markdown)
 
     tick = '`' if markdown else ''
@@ -64,14 +78,21 @@ async def run_all_processes_action(
             _ok, line = _format_result(ok, f'{tick}[{process.name}]{tick}: {detail}', markdown=markdown)
             lines.append(line if markdown else f'  {line}')
 
+    _logger.info("Control action '%s-all' requested by %s -> %s", action, source, 'ok' if any_ok else 'failed')
     if not lines:
         return _format_result(False, _('No eligible processes for {}.').format(action), markdown=markdown)
     return any_ok, '\n'.join(lines)
 
 
-async def reload_addons_command(client: DisManagerClient, *, markdown: bool = False) -> str:
+async def reload_addons_command(
+    client: DisManagerClient,
+    *,
+    markdown: bool = False,
+    source: str = 'unknown',
+) -> str:
     """Reload all DisManager addons and return the formatted status message."""
     count = await client.reload_addons()
+    _logger.info("Control action 'adreload' requested by %s -> reloaded %d addon(s)", source, count)
     _ok, message = _format_result(True, _('Reloaded {} addon(s).').format(count), markdown=markdown)
     return message
 

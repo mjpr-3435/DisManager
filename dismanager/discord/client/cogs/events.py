@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import logging
 from typing import TYPE_CHECKING, cast
 
 import discord
@@ -10,6 +11,8 @@ from ....core.commands import ProcessAction, run_process_action
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
+
+_logger = logging.getLogger(__name__)
 
 
 class _BotEvents(commands.Cog):
@@ -52,10 +55,17 @@ class _BotEvents(commands.Cog):
         cmd = message.content.strip().lower()
         if cmd in ('start', 'stop', 'kill', 'restart', 'plreload'):
             action = cast(ProcessAction, cmd)
-            ok, feedback = await run_process_action(self.bot, action, process.name, markdown=True)
+            source = f'Console thread ({message.author} id={message.author.id})'
+            ok, feedback = await run_process_action(self.bot, action, process.name, markdown=True, source=source)
             if not ok:
                 await message.channel.send(feedback, delete_after=5)
         elif cmd == 'logs':
+            _logger.info(
+                "Console thread command 'logs' on '%s' by %s (id=%s)",
+                process.name,
+                message.author,
+                message.author.id,
+            )
             await process._send_logs()
         else:
             process.execute(message.content)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import logging
 from typing import TYPE_CHECKING, Any
 
 from ....core.bootstrap.i18n import _
@@ -17,6 +18,8 @@ from ....core.extensions import (
 
 if TYPE_CHECKING:
     from ..client import DisManagerClient
+
+_logger = logging.getLogger(__name__)
 
 
 class AddonManager:
@@ -43,6 +46,7 @@ class AddonManager:
     async def load_addons(self, *, reload: bool) -> int:
         """Discover and load addons from ``.addons/``, purging stale modules on reload."""
         if reload:
+            _logger.info('Reloading addons...')
             await self.unload_addons()
 
         addons_root = ADDONS_DIR.resolve()
@@ -55,6 +59,8 @@ class AddonManager:
 
         candidates = discover_extension_candidates(addons_root)
         if not candidates:
+            if reload:
+                _logger.info('No addons found to load.')
             return 0
 
         if not reload:
@@ -68,6 +74,7 @@ class AddonManager:
                     'addon',
                     self._client,
                 )
+                _logger.info("Loaded addon '%s'.", addon_name)
                 if not reload:
                     print(_('     -> Imported {}').format(module_path.name))
             except Exception:
@@ -76,13 +83,16 @@ class AddonManager:
                 await self._client.report_error(f'AddonImport:{addon_name}')
 
         await self._emit_and_wait('on_addons_load')
-        return len(self._addons)
+        count = len(self._addons)
+        _logger.info('%s %d addon(s).', 'Reloaded' if reload else 'Loaded', count)
+        return count
 
     async def unload_addons(self) -> None:
         """Invoke ``on_addons_unload`` and ``unload()`` on active addons, then clear them."""
         if not self._addons:
             return
 
+        _logger.info('Unloading %d addon(s): %s', len(self._addons), ', '.join(self._addons))
         await self._emit_and_wait('on_addons_unload')
         await unload_extensions(
             self._addons,

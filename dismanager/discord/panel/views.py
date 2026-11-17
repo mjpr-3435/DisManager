@@ -90,7 +90,8 @@ class _RestartButton(discord.ui.Button[PanelView]):
                 view=None,
             )
             await confirm_interaction.delete_original_response()
-            await self.bot.request_restart()
+            user = confirm_interaction.user
+            await self.bot.request_restart(requested_by=f'Discord panel ({user} id={user.id})')
 
         await confirmation_request(
             _('Are you sure you want to restart DisManager?'),
