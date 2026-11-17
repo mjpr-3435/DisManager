@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import time
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any
 
@@ -14,6 +15,10 @@ from ...utils import confirmation_request
 if TYPE_CHECKING:
     from ....core.managed_process import BackupEntry, ManagedProcess
     from ...client import DisManagerClient
+
+
+_BLANK_SPACE = '\u200e '
+_EMBED_COLOUR = 0x2F3136
 
 
 class BackupsView(discord.ui.View):
@@ -31,30 +36,29 @@ class BackupsView(discord.ui.View):
         """Render the backups summary embed for the selected process."""
         if self.process is None:
             return discord.Embed(
-                title=f'📦 {_("Backups")}',
-                description=f'*{_("No processes configured.")}*',
-                color=0x2B2D31,
+                title=f'> 📦 {_("Backups")}',
+                description=f'```{_("No processes configured.")}```',
+                colour=_EMBED_COLOUR,
             )
 
         if not self.entries:
-            description = f'*{_("No backups found.")}*'
+            description = f'```{_("No backups found.")}```'
         else:
-            lines: list[str] = []
-            for entry in self.entries:
-                size_label = format_bytes(entry.size_bytes)
-                lines.append(
-                    f'📦 **{entry.name}**\n'
-                    f'> `{_("Disk Usage")}:` {size_label}\n'
-                    f'> `{_("Date")}:` {entry.created_at}'
-                )
-            description = '\n\n'.join(lines)
+            description = '\n'.join(
+                _format_backup_entry(entry, i) for i, entry in enumerate(self.entries)
+            )
 
         embed = discord.Embed(
-            title=f'📦 {_("Backups")} — {self.process.name}',
+            title=f'> 📦 {_("Backups")}: {self.process.name}',
             description=description,
-            color=0x2B2D31,
+            colour=_EMBED_COLOUR,
         )
-        embed.set_footer(text=_('Max backups: {}').format(self.bot.config.backups))
+        footer_text = (
+            f'{_("If you want to load a backup or make one, select it from the dropdown below.")}'
+            if self.entries
+            else f'{185 * _BLANK_SPACE}'
+        )
+        embed.set_footer(text=footer_text)
         return embed
 
     async def refresh(self, interaction: discord.Interaction[Any], *, message_id: int | None = None) -> None:
@@ -92,6 +96,25 @@ class BackupsView(discord.ui.View):
 # =========================================
 #            Internal Helpers
 # =========================================
+
+
+def _format_backup_entry(entry: BackupEntry, index: int) -> str:
+    """Format a single backup entry using a yellow-accented ANSI block."""
+    yellow = '\x1b[1;33m'
+    dim_yellow = '\x1b[0;33m'
+    white = '\x1b[0;37m'
+    reset = '\x1b[0m'
+    size_label = format_bytes(entry.size_bytes)
+    offset_hours, offset_minutes = divmod(
+        time.timezone // 60 if time.localtime().tm_isdst == 0 else time.altzone // 60,
+        60,
+    )
+    return (
+        f'```ansi\n{yellow}{index + 1}. 📦 {entry.name}{reset}\n'
+        f'{dim_yellow}   ↳ Disk Usage:{reset} {5 * _BLANK_SPACE}{white}{size_label}{reset}\n'
+        f'{dim_yellow}   ↳ Date:{reset} {11 * _BLANK_SPACE}{white}{entry.created_at} '
+        f'(UTC {offset_hours:+03}:{offset_minutes:02}){reset}```'
+    )
 
 
 class _ProcessSelect(discord.ui.Select[BackupsView]):
