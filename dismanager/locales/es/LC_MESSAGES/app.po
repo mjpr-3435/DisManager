@@ -463,6 +463,39 @@ msgstr  "No hay procesos configurados."
 msgid   "No backups found."
 msgstr  "No se encontraron copias de seguridad."
 
+msgid   "No servers or processes are registered in DisManager yet."
+msgstr  "Todavía no hay servidores o procesos registrados en DisManager."
+
+msgid   "Open **Processes** in the main panel to add your first process."
+msgstr  "Abre **Procesos** en el panel principal para añadir tu primer proceso."
+
+msgid   "Once created, press **Update** to manage its backups here."
+msgstr  "Cuando lo hayas creado, pulsa **Actualizar** para gestionar sus copias aquí."
+
+msgid   "Running"
+msgstr  "En ejecución"
+
+msgid   "Stop the process before creating or restoring a backup."
+msgstr  "Detén el proceso antes de crear o restaurar una copia."
+
+msgid   "Stopped"
+msgstr  "Detenido"
+
+msgid   "Ready to manage backups."
+msgstr  "Listo para gestionar copias."
+
+msgid   "This process has no saved backups yet."
+msgstr  "Este proceso aún no tiene copias de seguridad guardadas."
+
+msgid   "Press **Make Backup** below to create your first rotating backup."
+msgstr  "Pulsa **Crear copia** abajo para crear tu primera copia rotativa."
+
+msgid   "Select a backup to restore"
+msgstr  "Selecciona una copia para restaurar"
+
+msgid   "Make Backup"
+msgstr  "Crear copia"
+
 msgid   "Disk Usage"
 msgstr  "Uso de disco"
 

@@ -37,12 +37,18 @@ class BackupsView(discord.ui.View):
         if self.process is None:
             return discord.Embed(
                 title=f'> 📦 {_("Backups")}',
-                description=f'```{_("No processes configured.")}```',
+                description=(
+                    f'```{_("No processes configured.")}```\n'
+                    f'{_("Open **Processes** in the main panel to add your first process.")}'
+                ),
                 colour=_EMBED_COLOUR,
             )
 
         if not self.entries:
-            description = f'```{_("No backups found.")}```'
+            description = (
+                f'```{_("No backups found.")}```\n'
+                f'{_("Press **Make Backup** below to create your first rotating backup.")}'
+            )
         else:
             description = '\n'.join(
                 _format_backup_entry(entry, i) for i, entry in enumerate(self.entries)
@@ -53,12 +59,9 @@ class BackupsView(discord.ui.View):
             description=description,
             colour=_EMBED_COLOUR,
         )
-        footer_text = (
-            f'{_("If you want to load a backup or make one, select it from the dropdown below.")}'
-            if self.entries
-            else f'{185 * _BLANK_SPACE}'
-        )
-        embed.set_footer(text=footer_text)
+        if self.entries:
+            total_bytes = sum(entry.size_bytes for entry in self.entries)
+            embed.set_footer(text=f'{len(self.entries)} backup(s) · {format_bytes(total_bytes)}')
         return embed
 
     async def refresh(self, interaction: discord.Interaction[Any], *, message_id: int | None = None) -> None:
@@ -85,12 +88,15 @@ class BackupsView(discord.ui.View):
 
         if not processes or self.process is None:
             self.entries = []
+            self.add_item(_UpdateButton(row=0))
             return
 
         self.entries = self.process.list_backups()
         self.add_item(_ProcessSelect(processes, self.process))
-        self.add_item(_BackupSelect(self.entries))
-        self.add_item(_UpdateButton(row=2))
+        if self.entries:
+            self.add_item(_BackupSelect(self.entries))
+        self.add_item(_CreateBackupButton(row=2 if self.entries else 1))
+        self.add_item(_UpdateButton(row=2 if self.entries else 1))
 
 
 # =========================================
@@ -140,21 +146,13 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
     def __init__(self, entries: list[BackupEntry]) -> None:
         options = [
             discord.SelectOption(
-                label=_('➕ [Make Backup]'),
-                value='__make__',
-                description=_('Create a new rotating backup'),
+                label=f'📦 {entry.name}'[:100],
+                value=entry.name,
+                description=f'{format_bytes(entry.size_bytes)} • {entry.created_at}'[:100],
             )
+            for entry in entries[:25]
         ]
-        for entry in entries[:24]:
-            desc = f'{format_bytes(entry.size_bytes)} • {entry.created_at}'
-            options.append(
-                discord.SelectOption(
-                    label=f'📦 {entry.name}'[:100],
-                    value=entry.name,
-                    description=desc[:100],
-                )
-            )
-        super().__init__(placeholder=_('Select a backup'), options=options, row=1)
+        super().__init__(placeholder=_('Select a backup to restore'), options=options, row=1)
 
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         assert self.view is not None
@@ -174,24 +172,6 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
 
         selected = self.values[0]
         source_message_id = interaction.message.id if interaction.message is not None else None
-
-        if selected == '__make__':
-            prompt = _('Create a new backup for `{}`?').format(process.name)
-            await confirmation_request(
-                prompt,
-                interaction=interaction,
-                on_confirmation=lambda confirm_i: _run_backup_job(
-                    confirm_interaction=confirm_i,
-                    parent_interaction=interaction,
-                    parent_message_id=source_message_id,
-                    view=view,
-                    worker=process.make_backup,
-                    progress_template=_('🔄 `[{}]:` [{}/{}] files have been processed...'),
-                    done_message=_('✔ Backup for `{}` created successfully.').format(process.name),
-                ),
-            )
-            return
-
         entry = next((item for item in view.entries if item.name == selected), None)
         if entry is None:
             await interaction.response.send_message(_('✖ Backup not found.'), ephemeral=True)
@@ -211,6 +191,43 @@ class _BackupSelect(discord.ui.Select[BackupsView]):
                 worker=lambda progress: process.restore_backup(entry, progress),
                 progress_template=_('🔄 `[{}]:` [{}/{}] files have been unpacked...'),
                 done_message=_('✔ Backup `{}` restored successfully.').format(entry.name),
+            ),
+        )
+
+
+class _CreateBackupButton(discord.ui.Button[BackupsView]):
+    def __init__(self, *, row: int) -> None:
+        super().__init__(label=_('Make Backup'), style=discord.ButtonStyle.secondary, row=row)
+
+    async def callback(self, interaction: discord.Interaction[Any]) -> None:
+        assert self.view is not None
+        view = self.view
+        process = view.process
+        if process is None:
+            await interaction.response.defer()
+            await view.refresh(interaction)
+            return
+
+        if process.is_running():
+            await interaction.response.send_message(
+                _('✖ Process `{}` is running. Stop it before managing backups.').format(process.name),
+                ephemeral=True,
+            )
+            return
+
+        source_message_id = interaction.message.id if interaction.message is not None else None
+        prompt = _('Create a new backup for `{}`?').format(process.name)
+        await confirmation_request(
+            prompt,
+            interaction=interaction,
+            on_confirmation=lambda confirm_i: _run_backup_job(
+                confirm_interaction=confirm_i,
+                parent_interaction=interaction,
+                parent_message_id=source_message_id,
+                view=view,
+                worker=process.make_backup,
+                progress_template=_('🔄 `[{}]:` [{}/{}] files have been processed...'),
+                done_message=_('✔ Backup for `{}` created successfully.').format(process.name),
             ),
         )
 
