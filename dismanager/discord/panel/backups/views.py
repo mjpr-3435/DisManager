@@ -206,6 +206,12 @@ async def _run_backup_job(
     process_name = view.process.name
     latest = (0, 0)
 
+    await confirm_interaction.response.edit_message(
+        content=progress_template.format(process_name, 0, '?'),
+        embed=None,
+        view=None,
+    )
+
     def on_progress(done: int, total: int) -> None:
         nonlocal latest
         latest = (done, total)
@@ -214,6 +220,9 @@ async def _run_backup_job(
     last_snapshot: tuple[int, int] | None = None
 
     while not task.done():
+        await asyncio.sleep(0.8)
+        if task.done():
+            break
         snapshot = latest
         if snapshot != last_snapshot and snapshot[1] > 0:
             last_snapshot = snapshot
@@ -221,7 +230,6 @@ async def _run_backup_job(
                 await confirm_interaction.edit_original_response(
                     content=progress_template.format(process_name, snapshot[0], snapshot[1]),
                 )
-        await asyncio.sleep(1.0)
 
     try:
         await task
