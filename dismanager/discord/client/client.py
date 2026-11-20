@@ -112,13 +112,12 @@ class DisManagerClient(commands.Bot):
         if any(proc.is_running() for proc in self.processes):
             await _notify(_('Closing processes...'))
             shutdown_task = asyncio.create_task(self._processes_manager.shutdown_all())
-            started_at = time.monotonic()
-            while not shutdown_task.done():
-                done, _pending = await asyncio.wait({shutdown_task}, timeout=5.0)
-                if done:
-                    break
-                elapsed = int(time.monotonic() - started_at)
-                await _notify(f"{_('Closing processes...')} ({elapsed}s)")
+            done, _pending = await asyncio.wait({shutdown_task}, timeout=2.0)
+            remaining = 60
+            while not done and remaining > 0:
+                await _notify(_('Processes will be forcibly closed in {} seconds...').format(remaining))
+                remaining -= 1
+                done, _pending = await asyncio.wait({shutdown_task}, timeout=1.0)
             await shutdown_task
         else:
             await self._processes_manager.shutdown_all()
