@@ -87,13 +87,23 @@ class _RestartButton(discord.ui.Button[PanelView]):
     async def callback(self, interaction: discord.Interaction[Any]) -> None:
         async def on_confirmation(confirm_interaction: discord.Interaction[Any]) -> None:
             await confirm_interaction.response.edit_message(
-                content=_('Restarting...'),
+                content=_('Checking if there are open processes...'),
                 embed=None,
                 view=None,
             )
-            await confirm_interaction.delete_original_response()
+
+            async def _update_status(text: str) -> None:
+                await confirm_interaction.edit_original_response(content=text)
+
+            async def _cleanup_status() -> None:
+                await confirm_interaction.delete_original_response()
+
             user = confirm_interaction.user
-            await self.bot.request_restart(requested_by=f'Discord panel ({user} id={user.id})')
+            await self.bot.request_restart(
+                requested_by=f'Discord panel ({user} id={user.id})',
+                on_progress=_update_status,
+                on_before_close=_cleanup_status,
+            )
 
         await confirmation_request(
             _('Are you sure you want to restart DisManager?'),

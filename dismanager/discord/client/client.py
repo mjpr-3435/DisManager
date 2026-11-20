@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import logging
 import time
+from collections.abc import Awaitable, Callable
 
 import discord
 from discord.ext import commands
@@ -85,7 +87,12 @@ class DisManagerClient(commands.Bot):
         """Return whether the client closed due to a restart request."""
         return self._should_restart
 
-    async def close(self) -> None:
+    async def close(
+        self,
+        *,
+        on_progress: Callable[[str], Awaitable[None]] | None = None,
+        on_before_close: Callable[[], Awaitable[None]] | None = None,
+    ) -> None:
         """Shut down background tasks and close the Discord connection."""
         if self._closing:
             return
@@ -95,17 +102,46 @@ class DisManagerClient(commands.Bot):
         if self._ready_once:
             print(_('Closing DisManager...'))
 
+        async def _notify(message: str) -> None:
+            if on_progress is not None:
+                with contextlib.suppress(Exception):
+                    await on_progress(message)
+
         self._console_manager.stop()
-        await self._processes_manager.shutdown_all()
+
+        if any(proc.is_running() for proc in self.processes):
+            await _notify(_('Closing processes...'))
+            shutdown_task = asyncio.create_task(self._processes_manager.shutdown_all())
+            started_at = time.monotonic()
+            while not shutdown_task.done():
+                done, _ = await asyncio.wait({shutdown_task}, timeout=5.0)
+                if done:
+                    break
+                elapsed = int(time.monotonic() - started_at)
+                await _notify(f"{_('Closing processes...')} ({elapsed}s)")
+            await shutdown_task
+        else:
+            await self._processes_manager.shutdown_all()
+
+        await _notify(_('Restarting...') if self._should_restart else _('Closing DisManager...'))
         await self._addons_manager.unload_addons()
         await self._panel_manager.close()
+        if on_before_close is not None:
+            with contextlib.suppress(Exception):
+                await on_before_close()
         await super().close()
 
-    async def request_restart(self, *, requested_by: str | None = None) -> None:
+    async def request_restart(
+        self,
+        *,
+        requested_by: str | None = None,
+        on_progress: Callable[[str], Awaitable[None]] | None = None,
+        on_before_close: Callable[[], Awaitable[None]] | None = None,
+    ) -> None:
         """Shut down via the unified close flow and signal the runner to relaunch."""
         self._logger.info('Restart requested%s.', f' by {requested_by}' if requested_by else '')
         self._should_restart = True
-        await self.close()
+        await self.close(on_progress=on_progress, on_before_close=on_before_close)
 
     async def reload_addons(self) -> int:
         """Unload, purge cached addon modules, and reload all addons."""
