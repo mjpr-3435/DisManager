@@ -382,6 +382,9 @@ msgstr  "Esto TAMBIÉN eliminará permanentemente `DisManager/{}` y todos sus ar
 msgid   "System Resources"
 msgstr  "Recursos del Sistema"
 
+msgid   "Checking if there are open processes..."
+msgstr  "Comprobando si hay procesos abiertos..."
+
 msgid   "Closing processes..."
 msgstr  "Cerrando procesos..."
 

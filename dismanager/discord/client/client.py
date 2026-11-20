@@ -114,7 +114,7 @@ class DisManagerClient(commands.Bot):
             shutdown_task = asyncio.create_task(self._processes_manager.shutdown_all())
             started_at = time.monotonic()
             while not shutdown_task.done():
-                done, _ = await asyncio.wait({shutdown_task}, timeout=5.0)
+                done, _pending = await asyncio.wait({shutdown_task}, timeout=5.0)
                 if done:
                     break
                 elapsed = int(time.monotonic() - started_at)
