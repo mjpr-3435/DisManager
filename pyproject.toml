@@ -1,8 +1,26 @@
 [project]
 name = "dismanager"
-version = "0.1.0"
+version = "1.0.0"
 description = "Manage processes and stream their consoles through Discord."
 readme = "README.md"
+license = "LGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [
+    { name = "Mauricio", email = "150753762+mjpr-3435@users.noreply.github.com" },
+]
+keywords = ["discord", "process-manager", "console", "bot", "server-manager"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Chat",
+    "Topic :: System :: Systems Administration",
+    "Typing :: Typed",
+]
 requires-python = ">=3.13"
 
 dependencies = [
@@ -10,6 +28,12 @@ dependencies = [
     "psutil>=7.2.2",
     "ruamel-yaml>=0.19.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/mjpr-3435/DisManager"
+Repository = "https://github.com/mjpr-3435/DisManager"
+Issues = "https://github.com/mjpr-3435/DisManager/issues"
+Documentation = "https://github.com/mjpr-3435/DisManager/blob/main/docs/GUIDE.md"
 
 [project.scripts]
 dismanager = "dismanager.cli:main"

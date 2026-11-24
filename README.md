@@ -1,11 +1,12 @@
 # DisManager
 
+[![PyPI](https://img.shields.io/pypi/v/dismanager.svg)](https://pypi.org/project/dismanager/)
 [![Python 3.13+](https://img.shields.io/badge/Python-3.13%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/github/license/mjpr-3435/DisManager.svg)](https://github.com/mjpr-3435/DisManager/blob/main/LICENSE)
-[![Español](https://img.shields.io/badge/README-Español-brightgreen)](README.md)
-[![English](https://img.shields.io/badge/README-English-blue)](docs/README.en.md)
-[![Guía](https://img.shields.io/badge/Guía-Español-brightgreen)](docs/GUIDE.md)
-[![Guide](https://img.shields.io/badge/Guide-English-blue)](docs/GUIDE.en.md)
+[![Español](https://img.shields.io/badge/README-Español-brightgreen)](https://github.com/mjpr-3435/DisManager/blob/main/README.md)
+[![English](https://img.shields.io/badge/README-English-blue)](https://github.com/mjpr-3435/DisManager/blob/main/docs/README.en.md)
+[![Guía](https://img.shields.io/badge/Guía-Español-brightgreen)](https://github.com/mjpr-3435/DisManager/blob/main/docs/GUIDE.md)
+[![Guide](https://img.shields.io/badge/Guide-English-blue)](https://github.com/mjpr-3435/DisManager/blob/main/docs/GUIDE.en.md)
 
 **DisManager** es una aplicación en Python para administrar múltiples procesos y retransmitir sus consolas en tiempo real a través de un bot de Discord. Es una evolución de **McDis-RCON** (desarrollado a mano originalmente con las contribuciones de Mauricio y Elí Maciel); gran parte de su adaptación a esta nueva versión se realizó con **Gemini 4 Hydrogen**, combinada con partes escritas a mano y una revisión de la lógica principal adaptada por el modelo.
 
@@ -25,8 +26,6 @@
 ## Instalación
 
 Requisitos: **Python 3.13 o superior**.
-
-> **Nota:** El proyecto aún está en fase de pruebas y todavía no está publicado en PyPI. Próximamente podrá instalarse directamente con:
 
 ```sh
 pip install dismanager
@@ -55,4 +54,4 @@ dismanager run
 
 Una vez conectado, usa el botón **Config** del panel en Discord para registrar tus procesos.
 
-Para instrucciones paso a paso (incluyendo instalación desde cero, comandos, gestor de archivos, backups y addons/plugins), consulta la [Guía de uso](docs/GUIDE.md).
+Para instrucciones paso a paso (incluyendo instalación desde cero, comandos, gestor de archivos, backups y addons/plugins), consulta la [Guía de uso](https://github.com/mjpr-3435/DisManager/blob/main/docs/GUIDE.md).

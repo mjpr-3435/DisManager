@@ -1,5 +1,6 @@
 # DisManager
 
+[![PyPI](https://img.shields.io/pypi/v/dismanager.svg)](https://pypi.org/project/dismanager/)
 [![Python 3.13+](https://img.shields.io/badge/Python-3.13%2B-blue)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/github/license/mjpr-3435/DisManager.svg)](https://github.com/mjpr-3435/DisManager/blob/main/LICENSE)
 [![Español](https://img.shields.io/badge/README-Español-brightgreen)](../README.md)
@@ -25,8 +26,6 @@
 ## Installation
 
 Requirements: **Python 3.13 or higher**.
-
-> **Note:** This project is still in testing and is not yet published on PyPI. Soon you will be able to install it directly with:
 
 ```sh
 pip install dismanager

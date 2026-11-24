@@ -45,8 +45,6 @@ When active, you will see `(.venv)` at the beginning of your terminal prompt. *(
 
 ### Step 4: Install DisManager
 
-> **Note:** This project is still in testing and is not yet published on PyPI. Soon you will be able to install it directly with:
-
 ```sh
 pip install dismanager
 ```
@@ -99,7 +97,7 @@ dismanager run
 Example startup output:
 
 ```text
-Initializing DisManager v0.1.0...
+Initializing DisManager v1.0.0...
 Your configuration has been loaded successfully.
 Logged in as MyBot#1234!
 
