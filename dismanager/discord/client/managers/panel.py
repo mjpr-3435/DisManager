@@ -18,6 +18,9 @@ if TYPE_CHECKING:
 
 _PANEL_REFRESH_SECONDS = 15
 _ERROR_THREAD_NAME = 'Error Reports'
+_FOOTER_ICON_URL = (
+    'https://raw.githubusercontent.com/mjpr-3435/DisManager/master/assets/branding/dismanager-icon-512.png'
+)
 _logger = logging.getLogger(__name__)
 
 
@@ -78,7 +81,7 @@ class PanelManager:
             return
 
         embed = self._message.embeds[0].copy()
-        embed.set_footer(text=f"🔴 DisManager v{version('dismanager')}")
+        embed.set_footer(text=f"🔴 DisManager v{version('dismanager')}", icon_url=_FOOTER_ICON_URL)
         try:
             await self._message.edit(embed=embed)
         except Exception as exc:

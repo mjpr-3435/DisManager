@@ -16,6 +16,10 @@ from ...core.system import SystemMetrics, collect_system_metrics
 if TYPE_CHECKING:
     from ..client import DisManagerClient
 
+_FOOTER_ICON_URL = (
+    'https://raw.githubusercontent.com/mjpr-3435/DisManager/master/assets/branding/dismanager-icon-512.png'
+)
+
 
 async def update_panel(
     client: DisManagerClient,
@@ -33,6 +37,7 @@ async def update_panel(
         client._config.bot_prefix,
         error_thread=error_thread,
         process_snapshots=snapshots,
+        footer_icon_url=_FOOTER_ICON_URL,
     )
     return await _publish_or_update_panel(channel, client.user.id, embed, view=view)
 
@@ -70,6 +75,7 @@ def _build_panel_embed(
     *,
     error_thread: discord.Thread,
     process_snapshots: Sequence[_ProcessSnapshot],
+    footer_icon_url: str | None = None,
 ) -> discord.Embed:
     panel_colour = 0x2F3136
     console_commands = ('start', 'stop', 'kill', 'restart', 'logs', 'plreload')
@@ -162,7 +168,10 @@ def _build_panel_embed(
             value='\n'.join(f'`{w}`' for w in warnings),
         )
 
-    embed.set_footer(text=f"🟢 DisManager v{version('dismanager')}  •  RAM: {metrics.app_ram}")
+    embed.set_footer(
+        text=f"🟢 DisManager v{version('dismanager')}  •  RAM: {metrics.app_ram}",
+        icon_url=footer_icon_url,
+    )
     return embed
 
 

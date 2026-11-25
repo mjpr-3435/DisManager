@@ -1,6 +1,6 @@
 [project]
 name = "dismanager"
-version = "1.0.0"
+version = "1.0.1"
 description = "Manage processes and stream their consoles through Discord."
 readme = "README.md"
 license = "LGPL-3.0-or-later"

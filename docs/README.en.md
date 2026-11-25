@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/mjpr-3435/DisManager/master/assets/branding/dismanager-logo-dark-bg.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/mjpr-3435/DisManager/master/assets/branding/dismanager-logo-light-bg.svg">
+    <img alt="DisManager" src="https://raw.githubusercontent.com/mjpr-3435/DisManager/master/assets/branding/dismanager-logo-dark-bg.svg" width="380">
+  </picture>
+</p>
+
 # DisManager
 
 [![PyPI](https://img.shields.io/pypi/v/dismanager.svg)](https://pypi.org/project/dismanager/)
