@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import tempfile
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -10,7 +12,6 @@ from typing import TYPE_CHECKING
 
 from ...bootstrap.paths import BACKUPS_DIR
 from ...files import (
-    clear_directory_contents,
     copy_tree_with_progress,
     count_files,
     path_size_bytes,
@@ -41,6 +42,7 @@ class BackupManager:
 
     def __init__(self, process: ManagedProcess) -> None:
         self._process = process
+        self._operation_lock = threading.Lock()
         self.backups_dir.mkdir(parents=True, exist_ok=True)
 
     @property
@@ -74,19 +76,33 @@ class BackupManager:
         if on_progress is not None:
             on_progress(0, total)
 
-        _rotate_backups(backups_root, self._process.name, self._process.client.config.backups)
-
         target_dir = backups_root / f'{self._process.name} 1'
-        remove_path(target_dir)
-        copy_tree_with_progress(resolved_source, target_dir, on_progress, total=total)
+        with self._operation_lock:
+            staging = Path(tempfile.mkdtemp(prefix='.backup-', dir=backups_root))
+            staged_backup = staging / 'new'
+            try:
+                copy_tree_with_progress(resolved_source, staged_backup, on_progress, total=total)
+                timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                (staged_backup / BACKUP_LOG_FILENAME).write_text(f'{_LOG_PREFIX}{timestamp}\n', encoding='utf-8')
+            except BaseException:
+                remove_path(staging)
+                raise
 
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        (target_dir / BACKUP_LOG_FILENAME).write_text(f'{_LOG_PREFIX}{timestamp}\n', encoding='utf-8')
+            max_backups = self._process.client.config.backups
+            indexed = _scan_backups(backups_root, self._process.name, max_backups)
+            moves = [(path, staging / f'previous-{idx}') for idx, path in indexed]
+            moves.extend(
+                (staging / f'previous-{idx}', backups_root / f'{self._process.name} {idx + 1}')
+                for idx, _path in indexed
+                if idx < max_backups
+            )
+            moves.append((staged_backup, target_dir))
+            _publish_staged(staging, moves)
         _logger.info("[%s] Backup created: '%s'.", self._process.name, target_dir.name)
         return target_dir
 
     def restore(self, backup_dir: Path, on_progress: Callable[[int, int], None] | None = None) -> None:
-        """Clear the process directory contents and restore files from ``backup_dir``."""
+        """Stage a backup and replace the process directory, preserving original files on failure."""
         resolved_backup = backup_dir.resolve()
         if not resolved_backup.is_dir():
             raise FileNotFoundError(f"Backup directory '{resolved_backup}' does not exist.")
@@ -96,15 +112,29 @@ class BackupManager:
             on_progress(0, total)
 
         resolved_target = self._process.path.resolve()
-        resolved_target.mkdir(parents=True, exist_ok=True)
-        clear_directory_contents(resolved_target)
-        copy_tree_with_progress(
-            resolved_backup,
-            resolved_target,
-            on_progress,
-            total=total,
-            exclude_name=BACKUP_LOG_FILENAME,
-        )
+        with self._operation_lock:
+            resolved_target.mkdir(parents=True, exist_ok=True)
+            staging = Path(tempfile.mkdtemp(prefix=f'.{resolved_target.name}-restore-', dir=resolved_target.parent))
+            staged_restore = staging / 'new'
+            try:
+                copy_tree_with_progress(
+                    resolved_backup,
+                    staged_restore,
+                    on_progress,
+                    total=total,
+                    exclude_name=BACKUP_LOG_FILENAME,
+                )
+            except BaseException:
+                remove_path(staging)
+                raise
+
+            _publish_staged(
+                staging,
+                [
+                    (resolved_target, staging / 'previous-process'),
+                    (staged_restore, resolved_target),
+                ],
+            )
         _logger.info("[%s] Backup restored from '%s'.", self._process.name, resolved_backup.name)
 
 
@@ -130,14 +160,31 @@ def _scan_backups(backups_root: Path, process_name: str, max_backups: int) -> li
     return indexed
 
 
-def _rotate_backups(backups_root: Path, process_name: str, max_backups: int) -> None:
-    for idx, path in reversed(_scan_backups(backups_root, process_name, max_backups)):
-        if idx >= max_backups:
-            remove_path(path)
-        else:
-            dest = backups_root / f'{process_name} {idx + 1}'
-            remove_path(dest)
-            path.rename(dest)
+def _publish_staged(staging: Path, moves: list[tuple[Path, Path]]) -> None:
+    """Publish staged directories, undoing completed renames if publication fails."""
+    completed: list[tuple[Path, Path]] = []
+    try:
+        for source, target in moves:
+            source.rename(target)
+            completed.append((source, target))
+    except BaseException as exc:
+        rollback_failed = False
+        for source, target in reversed(completed):
+            try:
+                target.rename(source)
+            except OSError:
+                rollback_failed = True
+                _logger.exception("Could not roll back '%s' to '%s'.", target, source)
+        if rollback_failed:
+            raise OSError(f"Backup publication and rollback failed. Preserve recovery files in '{staging}'.") from exc
+        remove_path(staging)
+        raise
+
+    try:
+        remove_path(staging)
+    except OSError:
+        # Publication succeeded; leave old files for manual cleanup if deletion fails.
+        _logger.warning("Could not remove completed backup staging directory '%s'.", staging, exc_info=True)
 
 
 def _read_backup_timestamp(log_path: Path) -> str:
