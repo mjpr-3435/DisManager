@@ -73,7 +73,11 @@ def copy_tree_with_progress(
     """Recursively copy ``source_dir`` to ``target_dir``, invoking ``on_progress(copied, total)``."""
     copied = 0
     target_dir.mkdir(parents=True, exist_ok=True)
-    for root, dirs, files in os.walk(source_dir):
+
+    def raise_walk_error(error: OSError) -> None:
+        raise error
+
+    for root, dirs, files in os.walk(source_dir, onerror=raise_walk_error):
         rel = Path(root).relative_to(source_dir)
         dest_root = target_dir / rel
         dest_root.mkdir(parents=True, exist_ok=True)
